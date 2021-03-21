@@ -5,6 +5,7 @@
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 // Here we need to apply some filtering methods to our point cloud
 
@@ -102,6 +103,18 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   extract.filter(*cloud_outliers);
 
   return  cloud_outliers;
+}
+
+void Preprocessing::visualize_point_cloud(const PointCloudT &input_cloud) {
+  pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+  viewer->setBackgroundColor (0, 0, 0);
+  viewer->addPointCloud<PointT> (std::make_shared<PointCloudT>(input_cloud), "sample cloud");
+  viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
+
+  while (!viewer->wasStopped ())
+  {
+      viewer->spinOnce (100);
+  }
 }
 
 } // Preprocessing namespace.

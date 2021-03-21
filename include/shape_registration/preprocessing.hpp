@@ -31,8 +31,19 @@ PointCloudT::Ptr voxel_grid_downsampling(PointCloudT::Ptr &input_cloud, float vo
  */
 PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud);
 
-
+/**
+ * @brief extract_plane
+ * @param input_cloud
+ * @param threshold
+ * @return
+ */
 PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold);
+
+/**
+ * @brief visualize_point_cloud
+ * @param input_cloud
+ */
+void visualize_point_cloud(const PointCloudT &input_cloud);
 
 }
 
