@@ -22,7 +22,27 @@ using Matrix4 = Eigen::Matrix<float, 4, 4>;
 class ICPAlgorithm
 {
 public:
+  /**
+   * @brief ICPAlgorithm
+   * @param nh
+   */
   ICPAlgorithm(ros::NodeHandle *nh);
+
+private:
+  /**
+   * @brief compute
+   * @param ros_cloud
+   */
+  void compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud);
+
+  /**
+   * @brief estimate_transformation
+   * @param source
+   * @param target
+   * @return
+   */
+  Matrix4 estimate_transformation(PointCloudT &source, PointCloudT &target);
+
 private:
   ros::NodeHandle *m_nh;
   ros::Subscriber m_sub;
@@ -30,10 +50,6 @@ private:
   PointCloudT m_source_cloud;
   PointCloudT m_target_cloud;
   pcl::IterativeClosestPoint<PointT, PointT> icp;
-
-private:
-  void compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud);
-  Matrix4 estimate_transformation(PointCloudT &source, PointCloudT &target);
 };
 
 #endif // ICP_ALGORITHM_H

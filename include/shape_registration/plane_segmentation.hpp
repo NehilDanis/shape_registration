@@ -7,6 +7,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
+#include <string>
 
 #include "shape_registration/preprocessing.hpp"
 
@@ -14,13 +15,27 @@
 class PlaneSegmentation
 {
 public:
+  /**
+   * @brief PlaneSegmentation
+   * @param nh
+   */
   PlaneSegmentation(ros::NodeHandle *nh);
+
 private:
+  /**
+   * @brief compute
+   * @param ros_cloud
+   */
   void compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud);
+
+private:
   ros::Publisher m_pub;
   ros::Subscriber m_sub;
   double m_threshold_for_CT_plane_seg;
   double m_threshold_for_RGBD_plane_seg;
+  std::string m_CT_arm_input_path;
+  std::string m_segmented_CT_arm_output_path;
+
 };
 
 #endif // PLANE_SEGMENTATION_HPP

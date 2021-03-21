@@ -17,13 +17,13 @@ float voxel_size;
 void chatterCallback(const sensor_msgs::PointCloud2ConstPtr& colored_cloud){
   static ros::NodeHandle n1;
   static ros::Publisher pub = n1.advertise<sensor_msgs::PointCloud2>("/filtered_pointcloud", 30);
-  n1.param("pass_through_filter_x_min_range", x_min_val, -0.18f);
-  n1.param("pass_through_filter_x_max_range", x_max_val, 0.18f);
-  n1.param("pass_through_filter_y_min_range", y_min_val, -0.1f);
-  n1.param("pass_through_filter_y_max_range", y_max_val, 0.22f);
-  n1.param("pass_through_filter_z_min_range", z_min_val, 0.75f);
-  n1.param("pass_through_filter_z_max_range", z_max_val, 1.0f);
-  n1.param("voxel_grid_filter_voxel_size", voxel_size, 0.01f);
+  n1.param("preprocessing/pass_through_filter_x_min_range", x_min_val, -0.18f);
+  n1.param("preprocessing/pass_through_filter_x_max_range", x_max_val, 0.18f);
+  n1.param("preprocessing/pass_through_filter_y_min_range", y_min_val, -0.1f);
+  n1.param("preprocessing/pass_through_filter_y_max_range", y_max_val, 0.22f);
+  n1.param("preprocessing/pass_through_filter_z_min_range", z_min_val, 0.75f);
+  n1.param("preprocessing/pass_through_filter_z_max_range", z_max_val, 1.0f);
+  n1.param("preprocessing/voxel_grid_filter_voxel_size", voxel_size, 0.01f);
   PointCloudT::Ptr input_pointcloud(new PointCloudT);
   pcl::fromROSMsg(*colored_cloud, *input_pointcloud);
   PointCloudT::Ptr filtered_cloud(new PointCloudT);
@@ -41,8 +41,7 @@ void chatterCallback(const sensor_msgs::PointCloud2ConstPtr& colored_cloud){
 
 
 int main(int argc, char **argv){
-
-  // THe below line will basically initialize the node
+  // The below line will basically initialize the node
   ros::init(argc, argv, "preprocessing_node");
   ROS_INFO("Initialized Shape Registration Node");
   ros::NodeHandle n;
