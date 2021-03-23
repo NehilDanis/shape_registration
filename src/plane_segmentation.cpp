@@ -4,11 +4,14 @@
 
 PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
 {
+
+  // Get all the required parameters from the launch file
   nh->getParam("plane_segmentation/plane_segmentation_threshold_for_CT", m_threshold_for_CT_plane_seg);
   nh->getParam("plane_segmentation/plane_segmentation_threshold_for_RGBD", m_threshold_for_RGBD_plane_seg);
   nh->getParam("plane_segmentation/input_path_arm_data", m_CT_arm_input_path);
   nh->getParam("plane_segmentation/output_path_segmented_arm_data", m_segmented_CT_arm_output_path);
 
+  // Read the CT data from the file and save it into a point cloud obj
   PointCloudT::Ptr cloud (new PointCloudT);
   PointCloudT::Ptr extracted_cloud (new PointCloudT);
 
@@ -17,10 +20,12 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
     PCL_ERROR ("Couldn't read file \n");
   }
 
+  // After removal of the plane from the CT data, result is saved to the given output path
   extracted_cloud = Preprocessing::extract_plane(cloud, m_threshold_for_CT_plane_seg);
   pcl::io::savePCDFile(m_segmented_CT_arm_output_path, *extracted_cloud);
 
-  PointCloudT::Ptr segmented_cloud (new PointCloudT);
+
+  /*PointCloudT::Ptr segmented_cloud (new PointCloudT);
   if (pcl::io::loadPCDFile<PointT> (m_segmented_CT_arm_output_path, *segmented_cloud) == -1) //* load the file
   {
     PCL_ERROR ("Couldn't read file 2 \n");
@@ -34,8 +39,10 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
   while (!viewer->wasStopped ())
   {
       viewer->spinOnce (100);
-  }
+  }*/
 
+  // create a subscriber to subscribe the topic to get preprocessed data
+  // the publisher will publish the results to the /plane_segmeneted_data topic for the next step.
   this->m_sub = nh->subscribe("/filtered_pointcloud", 30, &PlaneSegmentation::compute, this);
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/plane_segmented_data", 30);
 
@@ -63,10 +70,13 @@ void PlaneSegmentation::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
 
 
 int main(int argc, char** argv) {
-  // The below line will basically initialize the node
+  // Initialize the plane segmentation node
+  // This node will segment the planes in the point clouds and subtract them
   ros::init(argc, argv, "plane_segmentation_node");
   ROS_INFO("Initialized Plane Sementation Node");
   ros::NodeHandle n;
+
+  // Create plane segmentation object and pass the node handle to its constructor
   PlaneSegmentation plane_segmnentation_obj(&n);
   ros::spin();
 }

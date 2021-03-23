@@ -23,7 +23,7 @@ public:
 
 private:
   /**
-   * @brief compute
+   * @brief compute is a callback function, removes the plane from the pointcloud data
    * @param ros_cloud
    */
   void compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud);
