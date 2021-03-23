@@ -44,7 +44,7 @@ void preprocessing_callback(const sensor_msgs::PointCloud2ConstPtr& colored_clou
 
   // Do some downsampling to the cloud data
   filtered_cloud = Preprocessing::voxel_grid_downsampling(filtered_cloud, voxel_size);
-  //filtered_cloud= Preprocessing::statistical_filtering(filtered_cloud);
+  filtered_cloud= Preprocessing::statistical_filtering(filtered_cloud);
 
 
   // After the preprocessing is done publish the result
@@ -61,7 +61,7 @@ int main(int argc, char **argv){
   // This node will handle the preprocessing of the data from Azure Kinect
 
   ros::init(argc, argv, "preprocessing_node");
-  ROS_INFO("Initialized Shape Registration Node");
+  ROS_INFO("Initialized Preprocessing Node");
   ros::NodeHandle n;
 
   // below subscriber subscribes to the points topic, to get the point cloud data from Azure Kinect

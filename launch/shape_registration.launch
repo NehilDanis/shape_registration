@@ -2,7 +2,7 @@
 <!-- Includes from other ROS packages-->
 <include file="$(find azure_kinect_ros_driver)/launch/driver.launch">
     <arg name="color_enabled" value="true"/>
-    <arg name="color_resolution" value="720P"/>
+    <arg name="color_resolution" value="1080P"/>
     <arg name="point_cloud" value="true"/>
     <arg name="rgb_point_cloud" value="true"/>
     <arg name="fps" value="5"/>
@@ -37,9 +37,10 @@
 </node>
 
 <!-- STEP 3: Register CT data with the point cloud data preprocessed in the previous step using ICP -->
-<!--<node pkg="shape_registration" type="registration_node" name="icp_registration" output="screen">
+<node pkg="shape_registration" type="registration_node" name="icp_registration" output="screen">
     <param name="ct_arm_data_path" type="string" value="$(arg segmented_CT_arm_data_path)"/>
+    <param name="icp_max_num_of_iterations" type="double" value="300"/>
     <param name="voxel_grid_filter_voxel_size" type="double" value="$(arg voxel_size)"/>
-</node>-->
+</node>
 
 </launch>

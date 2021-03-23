@@ -48,6 +48,7 @@ private:
   ros::Publisher m_pub;
   std::string m_data_path;
   float m_voxel_size;
+  int m_max_num_iter;
   PointCloudT m_source_cloud;
   PointCloudT m_target_cloud;
   pcl::IterativeClosestPoint<PointT, PointT> icp;
