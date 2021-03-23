@@ -44,9 +44,10 @@ private:
   Matrix4 estimate_transformation(PointCloudT &source, PointCloudT &target);
 
 private:
-  ros::NodeHandle *m_nh;
   ros::Subscriber m_sub;
   ros::Publisher m_pub;
+  std::string m_data_path;
+  float m_voxel_size;
   PointCloudT m_source_cloud;
   PointCloudT m_target_cloud;
   pcl::IterativeClosestPoint<PointT, PointT> icp;
