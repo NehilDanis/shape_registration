@@ -105,7 +105,7 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   return  cloud_outliers;
 }
 
-void Preprocessing::visualize_point_cloud(const PointCloudT &input_cloud) {
+void visualize_point_cloud(const PointCloudT &input_cloud) {
   pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
   viewer->setBackgroundColor (0, 0, 0);
   viewer->addPointCloud<PointT> (std::make_shared<PointCloudT>(input_cloud), "sample cloud");
