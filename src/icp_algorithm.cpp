@@ -85,22 +85,6 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
     ROS_INFO("score : %f", this->icp.getFitnessScore());
 
     if(this->icp.hasConverged()) {
-     pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
-      viewer->setBackgroundColor (1, 1, 1);
-      //viewer->addPointCloud<pcl::PointXYZ> (std::make_shared<PointCloudT>(final), "sample cloud");
-
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> rgb_final (std::make_shared<PointCloudT>(final_cloud), 0, 255, 0);
-      viewer->addPointCloud<pcl::PointXYZ> (std::make_shared<PointCloudT>(final_cloud), rgb_final, "final");
-
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> rgb_target (target, 255, 0, 0);
-      viewer->addPointCloud<pcl::PointXYZ> (target, rgb_target, "target");
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "target");
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "final");
-
-      while (!viewer->wasStopped ())
-      {
-          viewer->spinOnce (100);
-      }
       sensor_msgs::PointCloud2 msg;
       pcl::toROSMsg(final_cloud, msg);
       msg.fields = ros_cloud->fields;

@@ -1,6 +1,5 @@
 #include "shape_registration/plane_segmentation.hpp"
 #include <pcl/io/pcd_io.h>
-#include <pcl/visualization/pcl_visualizer.h>
 
 PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
 {
@@ -19,22 +18,6 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
 
   //extracted_cloud = Preprocessing::extract_plane(cloud, m_threshold_for_CT_plane_seg);
   //pcl::io::savePCDFile(m_segmented_CT_arm_output_path, *extracted_cloud);
-
-  /*PointCloudT::Ptr segmented_cloud (new PointCloudT);
-  if (pcl::io::loadPCDFile<PointT> (m_segmented_CT_arm_output_path, *segmented_cloud) == -1) // load the file
-  {
-    PCL_ERROR ("Couldn't read file 2 \n");
-  }
-
-  pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-  viewer->setBackgroundColor (0, 0, 0);
-  viewer->addPointCloud<PointT> (segmented_cloud, "sample cloud");
-  viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "sample cloud");
-
-  while (!viewer->wasStopped ())
-  {
-      viewer->spinOnce (100);
-  }*/
 
   this->m_sub = nh->subscribe("/filtered_pointcloud", 30, &PlaneSegmentation::compute, this);
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/plane_segmented_data", 30);

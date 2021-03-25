@@ -3,6 +3,7 @@
 
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 using PointT = pcl::PointXYZ;
 using PointCloudT = pcl::PointCloud<PointT>;
@@ -44,6 +45,8 @@ PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud);
  * @return
  */
 PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold);
+
+void visualize_point_cloud(const PointCloudT &source);
 
 
 }

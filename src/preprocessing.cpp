@@ -5,7 +5,6 @@
 #include <pcl/ModelCoefficients.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/sac_segmentation.h>
-#include <pcl/visualization/pcl_visualizer.h>
 
 // The methods used in preprocessing of the data from Azure cloud is kept here
 
@@ -103,6 +102,17 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   extract.filter(*cloud_outliers);
 
   return  cloud_outliers;
+}
+
+void visualize_point_cloud(const PointCloudT &source) {
+    pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
+    viewer->setBackgroundColor (1, 1, 1);
+    pcl::visualization::PointCloudColorHandlerCustom<PointT> rgb_final (std::make_shared<PointCloudT>(source), 0, 0, 255);
+    viewer->addPointCloud<PointT> (std::make_shared<PointCloudT>(source), rgb_final, "random_cloud");
+    while (!viewer->wasStopped ())
+    {
+        viewer->spinOnce (100);
+    }
 }
 
 } // Preprocessing namespace.

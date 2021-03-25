@@ -4,11 +4,11 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <iostream>
-#include "shape_registration/preprocessing.hpp"
 #include <pcl/registration/icp.h>
-#include <pcl/visualization/pcl_visualizer.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
+
+#include "shape_registration/preprocessing.hpp"
 
 
 #include <pcl/common/common_headers.h>
