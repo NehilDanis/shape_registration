@@ -68,7 +68,6 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
     point.z = point.z + diff.z;
   }
 
-
   // Before applying icp, it is better to find an initial alignment, between the clouds.
   /**
     Calculate the normals for source

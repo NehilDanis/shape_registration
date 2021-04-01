@@ -13,7 +13,6 @@ find_package(PCL 1.11.1 REQUIRED)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  # pcl_ros
   roscpp
   rospy
   sensor_msgs
@@ -25,7 +24,6 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES shape_registration
   CATKIN_DEPENDS
-  # pcl_ros
   roscpp
   rospy
   std_msgs
@@ -58,7 +56,6 @@ target_link_libraries(plane_segmentation_node
 
 target_link_libraries(registration_node
    ${catkin_LIBRARIES}
-   #pcl_visualization
    ${PCL_LIBRARIES}
  )
 

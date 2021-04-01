@@ -39,6 +39,8 @@ void preprocessing_callback(const sensor_msgs::PointCloud2ConstPtr& colored_clou
   PointCloudT::Ptr filtered_cloud(new PointCloudT);
 
   // Apply the pass through filter
+
+
   filtered_cloud = Preprocessing::pass_through_filter(input_pointcloud, x_min_val, x_max_val,
                                                       y_min_val, y_max_val, z_min_val, z_max_val);
 

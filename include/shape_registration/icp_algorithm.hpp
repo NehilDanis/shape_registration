@@ -4,9 +4,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <iostream>
-#include "shape_registration/preprocessing.hpp"
 #include <pcl/registration/icp.h>
-#include <pcl/visualization/pcl_visualizer.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
 
@@ -15,6 +13,7 @@
 
 #include <pcl/registration/correspondence_estimation.h>
 #include <pcl/registration/correspondence_rejection_sample_consensus.h>
+#include "shape_registration/preprocessing.hpp"
 
 #include <pcl/common/common_headers.h>
 #include <pcl/features/normal_3d.h>
