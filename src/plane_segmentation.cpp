@@ -61,7 +61,6 @@ void PlaneSegmentation::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
 }
 
 
-
 int main(int argc, char** argv) {
   // Initialize the plane segmentation node
   // This node will segment the planes in the point clouds and subtract them
