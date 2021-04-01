@@ -46,6 +46,15 @@ PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud);
 PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold);
 
 
+/**
+ * @brief extract_indices
+ * @param source
+ * @param indices_to_extract
+ * @param output
+ */
+void extract_indices(const PointCloudT::Ptr& source, std::shared_ptr<std::vector<int>>& indices_to_extract, PointCloudT::Ptr& output);
+
+
 }
 
 

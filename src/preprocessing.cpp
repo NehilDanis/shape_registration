@@ -6,6 +6,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/visualization/pcl_visualizer.h>
+#include <ros/ros.h>
 
 // The methods used in preprocessing of the data from Azure cloud is kept here
 
@@ -29,16 +30,20 @@ PointCloudT::Ptr pass_through_filter(PointCloudT::Ptr &input_cloud, float x_min_
   pass.filter(*cloud_filtered);
 
   // Apply filtering in the y dimension
-  /*pass.setInputCloud (cloud_filtered);
+  pass.setInputCloud (cloud_filtered);
   pass.setFilterFieldName ("y");
   pass.setFilterLimits (y_min_val, y_max_val);
   pass.filter(*cloud_filtered);
 
-  // Apply filtering in the x dimension
+  //Apply filtering in the x dimension
   pass.setInputCloud (cloud_filtered);
   pass.setFilterFieldName ("x");
   pass.setFilterLimits (x_min_val, x_max_val);
-  pass.filter(*cloud_filtered);*/
+  pass.filter(*cloud_filtered);
+
+  /*for(const auto &point : cloud_filtered->points){
+    ROS_INFO("y value : %f", point._PointXYZ::y);
+  }*/
 
   return cloud_filtered;
 }
@@ -64,6 +69,19 @@ PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud) {
   sor.filter (*cloud_filtered);
 
   return cloud_filtered;
+}
+
+void extract_indices(const PointCloudT::Ptr& source,
+                          std::shared_ptr<std::vector<int>>& indices_to_extract,
+                          PointCloudT::Ptr& output){
+
+  // Extract inliers
+  pcl::ExtractIndices<PointT> extract;
+  extract.setInputCloud(source);
+  extract.setIndices(indices_to_extract);
+  extract.setNegative(false);     // Extract the inliers
+  extract.filter(*output); // cloud_inliers contains the plane
+
 }
 
 
