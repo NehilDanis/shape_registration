@@ -25,12 +25,14 @@ ICPAlgorithm::ICPAlgorithm(ros::NodeHandle *nh)
     point.y = point.y / 1000;
     point.z = point.z / 1000;
   }
-  //cloud = Preprocessing::voxel_grid_downsampling(cloud, m_voxel_size);
+  cloud = Preprocessing::voxel_grid_downsampling(cloud, m_voxel_size);
   //cloud = Preprocessing::statistical_filtering(cloud);
 
   this->m_source_cloud = *cloud;
   this->m_sub = nh->subscribe("/plane_segmented_data", 30, &ICPAlgorithm::compute, this);
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/final_result", 30);
+  this->m_pub_source_keypoints = nh->advertise<sensor_msgs::PointCloud2>("/source_keypoints", 30);
+  this->m_pub_target_keypoints = nh->advertise<sensor_msgs::PointCloud2>("/target_keypoints", 30);
 
 }
 
@@ -43,11 +45,13 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
   *source = this->m_source_cloud;
 
   pcl::fromROSMsg(*ros_cloud, *target);
+  target = Preprocessing::voxel_grid_downsampling(target, m_voxel_size);
 
   ROS_INFO("Number of points in the source cloud: %d", int(source->points.size()));
   ROS_INFO("Number of points in the target cloud: %d", int(target->points.size()));
 
 
+  // Move source, closer to the target.
   PointT centroid_s;
   pcl::computeCentroid(*source, centroid_s);
   PointT centroid_t;
@@ -64,57 +68,194 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
     point.z = point.z + diff.z;
   }
 
-  if(source->points.size() != 0) {
-    // Set the input source and input target point clouds to the icp algorithm.
-    this->icp.setInputSource(source);
-    this->icp.setInputTarget(target);
 
-    // Set the maximum number of iterations
-    // It is 10 by default
-    this->icp.setMaximumIterations(this->m_max_num_iter);
+  // Before applying icp, it is better to find an initial alignment, between the clouds.
+  /**
+    Calculate the normals for source
+    */
+   PointCloudNormal::Ptr source_normals;
+   calculateNormals(source, source_normals);
 
-    // Create a new point cloud which will represent the result point cloud after
-    // iteratively applying transformations to the input source cloud, to make it
-    // look like the target point cloud.
-    PointCloudT final_cloud;
-    this->icp.align(final_cloud);
+  /**
+    Calculate the normals for target
+    */
+   PointCloudNormal::Ptr target_normals;
+   calculateNormals(target, target_normals);
 
-    // Print whether the icp algorithm has converged to the same result with the
-    // target, and the resulting rigid body transformation details.
-    ROS_INFO("has converged : %d", this->icp.hasConverged());
-    ROS_INFO("score : %f", this->icp.getFitnessScore());
+  /**
+    Now we want to find the persistent keypoints from both source and target clouds in different scales.
+    Then we can use these keypoints and their features while finding the initial alignment.
+    */
 
-    if(this->icp.hasConverged()) {
-     pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
-      viewer->setBackgroundColor (1, 1, 1);
-      //viewer->addPointCloud<pcl::PointXYZ> (std::make_shared<PointCloudT>(final), "sample cloud");
+   /**
+     FIND PERSISTENT FEATURES FOR THE SOURCE CLOUD
+     */
 
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> rgb_final (std::make_shared<PointCloudT>(final_cloud), 0, 255, 0);
-      viewer->addPointCloud<pcl::PointXYZ> (std::make_shared<PointCloudT>(final_cloud), rgb_final, "final");
+   FeatureCloud::Ptr source_features(new FeatureCloud());
+   auto source_keypoints_indices = pcl::make_shared<std::vector<int>>();
+   find_multiscale_persistent_features(source, source_normals, source_features, source_keypoints_indices);
+   PointCloudT::Ptr source_keypoints(new PointCloudT);
+   Preprocessing::extract_indices(source, source_keypoints_indices, source_keypoints);
 
-      pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> rgb_target (target, 255, 0, 0);
-      viewer->addPointCloud<pcl::PointXYZ> (target, rgb_target, "target");
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "target");
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 3, "final");
+   /**
+    FIND PERSISTENT FEATURES FOR THE TARGET CLOUD
+    */
 
-      while (!viewer->wasStopped ())
-      {
-          viewer->spinOnce (100);
-      }
+   FeatureCloud::Ptr target_features(new FeatureCloud());
+   auto target_keypoints_indices = pcl::make_shared<std::vector<int>>();
+   find_multiscale_persistent_features(target, target_normals, target_features, target_keypoints_indices);
+   PointCloudT::Ptr target_keypoints(new PointCloudT);
+   Preprocessing::extract_indices(target, target_keypoints_indices, target_keypoints);
+
+   sensor_msgs::PointCloud2 msg_source;
+   pcl::toROSMsg(*source, msg_source);
+   msg_source.fields = ros_cloud->fields;
+   msg_source.header = ros_cloud->header;
+   this->m_pub.publish(msg_source);
+
+   sensor_msgs::PointCloud2 msg_s_keypoint;
+   pcl::toROSMsg(*source_keypoints, msg_s_keypoint);
+   msg_s_keypoint.fields = ros_cloud->fields;
+   msg_s_keypoint.header = ros_cloud->header;
+   this->m_pub_source_keypoints.publish(msg_s_keypoint);
+
+   sensor_msgs::PointCloud2 msg_t_keypoint;
+   pcl::toROSMsg(*target_keypoints, msg_t_keypoint);
+   msg_t_keypoint.fields = ros_cloud->fields;
+   msg_t_keypoint.header = ros_cloud->header;
+   this->m_pub_target_keypoints.publish(msg_t_keypoint);
+
+   /**
+    Now that we have the keypoints along with their features both from source and target, we need to estimate the correspondance and
+    drop the ones which are not likely.
+    */
+
+   pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
+   pcl::registration::CorrespondenceEstimation<Feature, Feature> cest;
+
+   cest.setInputSource(source_features);
+   cest.setInputTarget(target_features);
+   cest.determineCorrespondences(*correspondences);
+
+   pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> rejector;
+   pcl::CorrespondencesPtr corr_filtered(new pcl::Correspondences);
+   rejector.setInputSource(source_keypoints);
+   rejector.setInputTarget(target_keypoints);
+   rejector.setInlierThreshold(2.5/100.0);
+   rejector.setMaximumIterations(1000000);
+   rejector.setRefineModel(false);
+   rejector.setInputCorrespondences(correspondences);
+   rejector.getCorrespondences(*corr_filtered);
+
+   ROS_INFO("Number of correspondences is : %zu", corr_filtered->size());
+   //estimate_correspondances(source_features, target_features, source_keypoints, target_keypoints, corr_filtered);
+
+   /**
+    Find the initial alignment between source and the target
+    */
+
+   pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;
+   pcl::registration::TransformationEstimationSVD<PointT,PointT> transformation_est_SVD;
+   transformation_est_SVD.estimateRigidTransformation(*source_keypoints, *target_keypoints, *corr_filtered, transformation);
+
+   /**
+     Transform the source point cloud given the alignment
+     */
+
+
+   pcl::transformPointCloud(*source, *source, transformation);
+
+
+  // Set the input source and input target point clouds to the icp algorithm.
+  /*this->icp.setInputSource(source);
+  this->icp.setInputTarget(target);
+
+  // Set the maximum number of iterations
+  // It is 10 by default
+  this->icp.setMaximumIterations(this->m_max_num_iter);
+
+  // Create a new point cloud which will represent the result point cloud after
+  // iteratively applying transformations to the input source cloud, to make it
+  // look like the target point cloud.
+  PointCloudT final_cloud;
+  this->icp.align(final_cloud);
+
+  // Print whether the icp algorithm has converged to the same result with the
+  // target, and the resulting rigid body transformation details.
+  ROS_INFO("has converged : %d", this->icp.hasConverged());
+  ROS_INFO("score : %f", this->icp.getFitnessScore());
+
+  if(this->icp.hasConverged()) {
       sensor_msgs::PointCloud2 msg;
       pcl::toROSMsg(final_cloud, msg);
       msg.fields = ros_cloud->fields;
       msg.header = ros_cloud->header;
       this->m_pub.publish(msg);
-    }
-  }
+    }*/
 
 }
 
-Matrix4 ICPAlgorithm::estimate_transformation(PointCloudT &source, PointCloudT &target) {
+void ICPAlgorithm::find_multiscale_persistent_features(PointCloudT::Ptr &input_cloud,
+                                                       PointCloudNormal::Ptr& input_cloud_normals,
+                                                       FeatureCloud::Ptr& features,
+                                                       std::shared_ptr<std::vector<int>>& indices) {
+    pcl::MultiscaleFeaturePersistence<PointT, Feature> feature_persistence;
+    std::vector<float> scale_values;
+    for (float x = 1.0f; x < 3.6f; x += 0.35f)
+      scale_values.push_back(x / 100.0f);
+    feature_persistence.setScalesVector(scale_values);
+    feature_persistence.setAlpha(1.3f);
+    pcl::FPFHEstimation<PointT, pcl::Normal, Feature>::Ptr fpfh_estimation(new pcl::FPFHEstimation<PointT, pcl::Normal, Feature>());
+    fpfh_estimation->setInputCloud(input_cloud);
+    fpfh_estimation->setInputNormals(input_cloud_normals);
+    pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT>());
+    fpfh_estimation->setSearchMethod(tree);
+    feature_persistence.setFeatureEstimator(fpfh_estimation);
+    feature_persistence.setDistanceMetric(pcl::KL);
+
+    feature_persistence.determinePersistentFeatures(*features, indices);
+
+}
+
+void ICPAlgorithm::calculateNormals(PointCloudT::Ptr& cloud_subsampled,
+                                  PointCloudNormal::Ptr& cloud_subsampled_normals)
+{
+  cloud_subsampled_normals = PointCloudNormal::Ptr(new PointCloudNormal());
+  pcl::NormalEstimation<PointT, pcl::Normal> normal_estimation_filter;
+  normal_estimation_filter.setInputCloud(cloud_subsampled);
+  pcl::search::KdTree<PointT>::Ptr search_tree(new pcl::search::KdTree<PointT>);
+  normal_estimation_filter.setSearchMethod(search_tree);
+  normal_estimation_filter.setRadiusSearch(0.05);
+  normal_estimation_filter.compute(*cloud_subsampled_normals);
+}
+
+void estimate_correspondances(FeatureCloud::Ptr& source_features,
+                              FeatureCloud::Ptr& target_features,
+                              PointCloudT::Ptr& source_keypoints,
+                              PointCloudT::Ptr& target_keypoints,
+                              pcl::CorrespondencesPtr& corr_filtered) {
+  pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
+  pcl::registration::CorrespondenceEstimation<Feature, Feature> cest;
+
+  cest.setInputSource(source_features);
+  cest.setInputTarget(target_features);
+  cest.determineCorrespondences(*correspondences);
+
+  pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> rejector;
+  rejector.setInputSource(source_keypoints);
+  rejector.setInputTarget(target_keypoints);
+  rejector.setInlierThreshold(2.5);
+  rejector.setMaximumIterations(1000000);
+  rejector.setRefineModel(false);
+  rejector.setInputCorrespondences(correspondences);
+  rejector.getCorrespondences(*corr_filtered);
+}
+
+Matrix4 ICPAlgorithm::estimate_transformation(PointCloudT::Ptr &source_keypoints,
+                                              PointCloudT::Ptr &target_keypoints) {
     pcl::registration::TransformationEstimationSVD<PointT,PointT> transformation_est_SVD;
     pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;
-    transformation_est_SVD.estimateRigidTransformation (source, target, transformation);
+    transformation_est_SVD.estimateRigidTransformation (*source_keypoints, *target_keypoints, transformation);
     return transformation;
 }
 
