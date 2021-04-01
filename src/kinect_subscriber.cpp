@@ -27,8 +27,8 @@ void preprocessing_callback(const sensor_msgs::PointCloud2ConstPtr& colored_clou
   n1.param("preprocessing/pass_through_filter_x_max_range", x_max_val, 0.18f);
   n1.param("preprocessing/pass_through_filter_y_min_range", y_min_val, -0.1f);
   n1.param("preprocessing/pass_through_filter_y_max_range", y_max_val, 0.22f);
-  n1.param("preprocessing/pass_through_filter_z_min_range", z_min_val, 0.75f);
-  n1.param("preprocessing/pass_through_filter_z_max_range", z_max_val, 1.0f);
+  n1.param("preprocessing/pass_through_filter_z_min_range", z_min_val, 0.89f);
+  n1.param("preprocessing/pass_through_filter_z_max_range", z_max_val, 1.12f);
   n1.param("preprocessing/voxel_grid_filter_voxel_size", voxel_size, 0.01f);
 
   // Create pcl point cloud data from the ros point cloud
@@ -43,8 +43,8 @@ void preprocessing_callback(const sensor_msgs::PointCloud2ConstPtr& colored_clou
                                                       y_min_val, y_max_val, z_min_val, z_max_val);
 
   // Do some downsampling to the cloud data
-  filtered_cloud = Preprocessing::voxel_grid_downsampling(filtered_cloud, voxel_size);
-  filtered_cloud= Preprocessing::statistical_filtering(filtered_cloud);
+  //filtered_cloud = Preprocessing::voxel_grid_downsampling(filtered_cloud, voxel_size);
+  //filtered_cloud= Preprocessing::statistical_filtering(filtered_cloud);
 
 
   // After the preprocessing is done publish the result
