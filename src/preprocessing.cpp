@@ -16,7 +16,6 @@ namespace Preprocessing {
 PointCloudT::Ptr pass_through_filter(PointCloudT::Ptr &input_cloud, float x_min_val, float x_max_val, float y_min_val, float y_max_val, float z_min_val, float z_max_val) {
 
   PointCloudT::Ptr cloud_filtered (new PointCloudT);
-
   // create a pass through filter object
   // the parameter to the object constructer is false, if you make it true
   // it will extract out the parts that are filtered, after the filtering
@@ -41,10 +40,6 @@ PointCloudT::Ptr pass_through_filter(PointCloudT::Ptr &input_cloud, float x_min_
   pass.setFilterLimits (x_min_val, x_max_val);
   pass.filter(*cloud_filtered);
 
-  /*for(const auto &point : cloud_filtered->points){
-    ROS_INFO("y value : %f", point._PointXYZ::y);
-  }*/
-
   return cloud_filtered;
 }
 
@@ -60,12 +55,12 @@ PointCloudT::Ptr voxel_grid_downsampling(PointCloudT::Ptr &input_cloud, float vo
 }
 
 
-PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud) {
+PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud, double std_dev) {
   PointCloudT::Ptr cloud_filtered (new PointCloudT);
   pcl::StatisticalOutlierRemoval<PointT> sor;
   sor.setInputCloud (input_cloud);
   sor.setMeanK (50);
-  sor.setStddevMulThresh (1.0);
+  sor.setStddevMulThresh (std_dev);
   sor.filter (*cloud_filtered);
 
   return cloud_filtered;

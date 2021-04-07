@@ -36,7 +36,7 @@ PointCloudT::Ptr voxel_grid_downsampling(PointCloudT::Ptr &input_cloud, float vo
  * @param input_cloud
  * @return
  */
-PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud);
+PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud, double std_dev);
 
 /**
  * @brief extract_plane
