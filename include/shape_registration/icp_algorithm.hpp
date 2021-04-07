@@ -83,6 +83,7 @@ private:
   ros::Publisher m_pub;
   ros::Publisher m_pub_source_keypoints;
   ros::Publisher m_pub_target_keypoints;
+  ros::Publisher m_pub_transformed_source;
   std::string m_data_path;
   float m_voxel_size;
   int m_max_num_iter;

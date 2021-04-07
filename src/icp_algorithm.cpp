@@ -26,13 +26,14 @@ ICPAlgorithm::ICPAlgorithm(ros::NodeHandle *nh)
     point.z = point.z / 1000;
   }
   cloud = Preprocessing::voxel_grid_downsampling(cloud, m_voxel_size);
-  //cloud = Preprocessing::statistical_filtering(cloud);
+  cloud = Preprocessing::statistical_filtering(cloud, 1.5);
 
   this->m_source_cloud = *cloud;
   this->m_sub = nh->subscribe("/plane_segmented_data", 30, &ICPAlgorithm::compute, this);
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/final_result", 30);
   this->m_pub_source_keypoints = nh->advertise<sensor_msgs::PointCloud2>("/source_keypoints", 30);
   this->m_pub_target_keypoints = nh->advertise<sensor_msgs::PointCloud2>("/target_keypoints", 30);
+  this->m_pub_transformed_source = nh->advertise<sensor_msgs::PointCloud2>("/transformed_source", 30);
 
 }
 
@@ -45,6 +46,7 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
   *source = this->m_source_cloud;
 
   pcl::fromROSMsg(*ros_cloud, *target);
+  ROS_INFO("Number of points in the target cloud before: %d", int(target->points.size()));
   target = Preprocessing::voxel_grid_downsampling(target, m_voxel_size);
 
   ROS_INFO("Number of points in the source cloud: %d", int(source->points.size()));
@@ -81,6 +83,11 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    PointCloudNormal::Ptr target_normals;
    calculateNormals(target, target_normals);
 
+   ROS_INFO("Normals are computed!");
+
+   //ROS_INFO("Number of normals in the source cloud: %d", int(source_normals->size()));
+   //ROS_INFO("Number of normals in the target cloud: %d", int(target_normals->size()));
+
   /**
     Now we want to find the persistent keypoints from both source and target clouds in different scales.
     Then we can use these keypoints and their features while finding the initial alignment.
@@ -96,6 +103,8 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    PointCloudT::Ptr source_keypoints(new PointCloudT);
    Preprocessing::extract_indices(source, source_keypoints_indices, source_keypoints);
 
+   ROS_INFO("Found the persistent features for the source cloud: %zu", source_keypoints->size());
+
    /**
     FIND PERSISTENT FEATURES FOR THE TARGET CLOUD
     */
@@ -106,13 +115,10 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    PointCloudT::Ptr target_keypoints(new PointCloudT);
    Preprocessing::extract_indices(target, target_keypoints_indices, target_keypoints);
 
-   sensor_msgs::PointCloud2 msg_source;
-   pcl::toROSMsg(*source, msg_source);
-   msg_source.fields = ros_cloud->fields;
-   msg_source.header = ros_cloud->header;
-   this->m_pub.publish(msg_source);
+   ROS_INFO("Found the persistent features for the target cloud: %zu", target_keypoints->size());
 
-   sensor_msgs::PointCloud2 msg_s_keypoint;
+
+   /*sensor_msgs::PointCloud2 msg_s_keypoint;
    pcl::toROSMsg(*source_keypoints, msg_s_keypoint);
    msg_s_keypoint.fields = ros_cloud->fields;
    msg_s_keypoint.header = ros_cloud->header;
@@ -122,7 +128,7 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    pcl::toROSMsg(*target_keypoints, msg_t_keypoint);
    msg_t_keypoint.fields = ros_cloud->fields;
    msg_t_keypoint.header = ros_cloud->header;
-   this->m_pub_target_keypoints.publish(msg_t_keypoint);
+   this->m_pub_target_keypoints.publish(msg_t_keypoint);*/
 
    /**
     Now that we have the keypoints along with their features both from source and target, we need to estimate the correspondance and
@@ -164,9 +170,15 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
 
    pcl::transformPointCloud(*source, *source, transformation);
 
+   sensor_msgs::PointCloud2 msg;
+   pcl::toROSMsg(*source, msg);
+   msg.fields = ros_cloud->fields;
+   msg.header = ros_cloud->header;
+   this->m_pub_transformed_source.publish(msg);
+
 
   // Set the input source and input target point clouds to the icp algorithm.
-  /*this->icp.setInputSource(source);
+  this->icp.setInputSource(source);
   this->icp.setInputTarget(target);
 
   // Set the maximum number of iterations
@@ -190,7 +202,7 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
       msg.fields = ros_cloud->fields;
       msg.header = ros_cloud->header;
       this->m_pub.publish(msg);
-    }*/
+    }
 
 }
 
@@ -200,10 +212,10 @@ void ICPAlgorithm::find_multiscale_persistent_features(PointCloudT::Ptr &input_c
                                                        std::shared_ptr<std::vector<int>>& indices) {
     pcl::MultiscaleFeaturePersistence<PointT, Feature> feature_persistence;
     std::vector<float> scale_values;
-    for (float x = 1.0f; x < 3.6f; x += 0.35f)
+    for (float x = 1.0f; x < 3.5f; x += 0.50f)
       scale_values.push_back(x / 100.0f);
     feature_persistence.setScalesVector(scale_values);
-    feature_persistence.setAlpha(1.3f);
+    feature_persistence.setAlpha(0.8f);
     pcl::FPFHEstimation<PointT, pcl::Normal, Feature>::Ptr fpfh_estimation(new pcl::FPFHEstimation<PointT, pcl::Normal, Feature>());
     fpfh_estimation->setInputCloud(input_cloud);
     fpfh_estimation->setInputNormals(input_cloud_normals);
