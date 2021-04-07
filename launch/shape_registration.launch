@@ -4,6 +4,7 @@
     <arg name="color_enabled" value="true"/>
     <arg name="color_resolution" value="1080P"/>
     <arg name="point_cloud" value="true"/>
+    <arg name="point_cloud_in_depth_frame" default="true"/>
     <arg name="rgb_point_cloud" value="true"/>
     <arg name="fps" value="5"/>
 </include>
@@ -11,20 +12,20 @@
 <!-- Common arguments -->
 
 <arg name="voxel_size" default="0.01"/>
-<arg name="CT_arm_data_path" default="/home/nehil/Desktop/important_files/arm.pcd"/>
-<arg name="CT_artery_data_path" default="/home/nehil/Desktop/important_files/artery.pcd"/>
-<arg name="segmented_CT_arm_data_path" default="/home/nehil/Desktop/important_files/plane_segmented_arm.pcd"/>
+<arg name="CT_arm_data_path" default="/home/camp-robot/NehilDanis/catkin_ws/src/shape_registration/data/arm.pcd"/>
+<arg name="CT_artery_data_path" default="/home/camp-robot/NehilDanis/catkin_ws/src/shape_registration/data/artery.pcd"/>
+<arg name="segmented_CT_arm_data_path" default="/home/camp-robot/NehilDanis/catkin_ws/src/shape_registration/data/plane_segmented_arm.pcd"/>
 
 <!-- Nodes -->
 
 <!-- STEP 1: Apply preprocessing on the data received from Azure Kinect -->
 <node pkg="shape_registration" type="preprocessing_node" name="preprocessing" output="screen">
-    <param name="pass_through_filter_x_min_range" type="double" value="0.0"/>
-    <param name="pass_through_filter_x_max_range" type="double" value="1.0"/>
-    <param name="pass_through_filter_y_min_range" type="double" value="0.0"/>
-    <param name="pass_through_filter_y_max_range" type="double" value="1.0"/>
-    <param name="pass_through_filter_z_min_range" type="double" value="0.0"/>
-    <param name="pass_through_filter_z_max_range" type="double" value="1.0"/>
+    <param name="pass_through_filter_x_min_range" type="double" value="-0.41"/>
+    <param name="pass_through_filter_x_max_range" type="double" value="0.69"/>
+    <param name="pass_through_filter_y_min_range" type="double" value="-0.31"/>
+    <param name="pass_through_filter_y_max_range" type="double" value="0.27"/>
+    <param name="pass_through_filter_z_min_range" type="double" value="0.69"/>
+    <param name="pass_through_filter_z_max_range" type="double" value="9.94"/>
     <param name="voxel_grid_filter_voxel_size" type="double" value="$(arg voxel_size)"/>
 </node>
 
