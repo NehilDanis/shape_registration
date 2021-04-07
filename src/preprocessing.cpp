@@ -84,6 +84,7 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
 
   PointCloudT::Ptr cloud_inliers(new PointCloudT);
   PointCloudT::Ptr cloud_outliers(new PointCloudT);
+  PointCloudT::Ptr cloud_outliers_one_side_plane(new PointCloudT);
   pcl::ModelCoefficients::Ptr plane(new pcl::ModelCoefficients);
   pcl::PointIndices::Ptr inliers_plane(new pcl::PointIndices);
 
@@ -115,7 +116,18 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   extract.setNegative(true); // Extract the outliers
   extract.filter(*cloud_outliers);
 
-  return  cloud_outliers;
+  auto a = plane->values[0];
+  auto b = plane->values[1];
+  auto c = plane->values[2];
+  auto d = plane->values[3];
+  for(const auto &point : cloud_outliers->points) {
+    float plane_side = a * point._PointXYZ::x + b * point._PointXYZ::y + c * point._PointXYZ::z + d;
+    if(plane_side < 0) {
+      cloud_outliers_one_side_plane->points.push_back(point);
+    }
+  }
+
+  return  cloud_outliers_one_side_plane;
 }
 
 void visualize_point_cloud(const PointCloudT &source) {

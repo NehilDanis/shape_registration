@@ -44,10 +44,6 @@ void preprocessing_callback(const sensor_msgs::PointCloud2ConstPtr& colored_clou
   filtered_cloud = Preprocessing::pass_through_filter(input_pointcloud, x_min_val, x_max_val,
                                                       y_min_val, y_max_val, z_min_val, z_max_val);
 
-  // Do some downsampling to the cloud data
-  //filtered_cloud = Preprocessing::voxel_grid_downsampling(filtered_cloud, voxel_size);
-  //filtered_cloud= Preprocessing::statistical_filtering(filtered_cloud);
-
 
   // After the preprocessing is done publish the result
   sensor_msgs::PointCloud2 msg;

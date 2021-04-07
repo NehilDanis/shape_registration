@@ -28,10 +28,11 @@ void PlaneSegmentation::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
   PointCloudT::Ptr pcl_cloud (new PointCloudT);
   PointCloudT::Ptr segmented_cloud (new PointCloudT);
   pcl::fromROSMsg(*ros_cloud, *pcl_cloud);
-  ROS_INFO("number of points : %d", int(pcl_cloud->points.size()));
+
   segmented_cloud = Preprocessing::extract_plane(pcl_cloud, m_threshold_for_RGBD_plane_seg);
+
+  segmented_cloud = Preprocessing::statistical_filtering(segmented_cloud, 1.0);
   if(segmented_cloud != nullptr) {
-    ROS_INFO("number of points in segmented cloud: %d", int(segmented_cloud->points.size()));
     sensor_msgs::PointCloud2 msg;
     pcl::toROSMsg(*segmented_cloud, msg);
     msg.fields = ros_cloud->fields;
