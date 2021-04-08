@@ -61,7 +61,9 @@ private:
   void find_multiscale_persistent_features(PointCloudT::Ptr &input_cloud,
                                            PointCloudNormal::Ptr& input_cloud_normals,
                                            FeatureCloud::Ptr& features,
-                                           std::shared_ptr<std::vector<int>>& indices);
+                                           std::shared_ptr<std::vector<int>>& indices,
+                                           std::vector<float> & scale_values,
+                                           const float alpha);
 
   void estimate_correspondances(FeatureCloud::Ptr& source_features,
                                 FeatureCloud::Ptr& target_features,
@@ -87,6 +89,10 @@ private:
   std::string m_data_path;
   float m_voxel_size;
   int m_max_num_iter;
+  std::vector<float> m_scale_values_MRI{1.0/100.0, 1.5/100.0, 2.0/100.0, 2.5/100.0, 3.0/100.0};
+  std::vector<float> m_scale_values_Kinect{1.0/100.0, 1.5/100.0, 2.0/100.0, 2.5/100.0, 3.0/100.0};
+  float m_alpha_MRI = 0.8f;
+  float m_alpha_kinect = 0.3f;
   PointCloudT m_source_cloud;
   PointCloudT m_target_cloud;
   pcl::IterativeClosestPoint<PointT, PointT> icp;

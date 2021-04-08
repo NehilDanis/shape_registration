@@ -49,10 +49,6 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
   ROS_INFO("Number of points in the target cloud before: %d", int(target->points.size()));
   target = Preprocessing::voxel_grid_downsampling(target, m_voxel_size);
 
-  ROS_INFO("Number of points in the source cloud: %d", int(source->points.size()));
-  ROS_INFO("Number of points in the target cloud: %d", int(target->points.size()));
-
-
   // Move source, closer to the target.
   PointT centroid_s;
   pcl::computeCentroid(*source, centroid_s);
@@ -83,11 +79,6 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    PointCloudNormal::Ptr target_normals;
    calculateNormals(target, target_normals);
 
-   ROS_INFO("Normals are computed!");
-
-   //ROS_INFO("Number of normals in the source cloud: %d", int(source_normals->size()));
-   //ROS_INFO("Number of normals in the target cloud: %d", int(target_normals->size()));
-
   /**
     Now we want to find the persistent keypoints from both source and target clouds in different scales.
     Then we can use these keypoints and their features while finding the initial alignment.
@@ -99,11 +90,9 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
 
    FeatureCloud::Ptr source_features(new FeatureCloud());
    auto source_keypoints_indices = pcl::make_shared<std::vector<int>>();
-   find_multiscale_persistent_features(source, source_normals, source_features, source_keypoints_indices);
+   find_multiscale_persistent_features(source, source_normals, source_features, source_keypoints_indices, m_scale_values_MRI, m_alpha_MRI);
    PointCloudT::Ptr source_keypoints(new PointCloudT);
    Preprocessing::extract_indices(source, source_keypoints_indices, source_keypoints);
-
-   ROS_INFO("Found the persistent features for the source cloud: %zu", source_keypoints->size());
 
    /**
     FIND PERSISTENT FEATURES FOR THE TARGET CLOUD
@@ -111,14 +100,12 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
 
    FeatureCloud::Ptr target_features(new FeatureCloud());
    auto target_keypoints_indices = pcl::make_shared<std::vector<int>>();
-   find_multiscale_persistent_features(target, target_normals, target_features, target_keypoints_indices);
+   find_multiscale_persistent_features(target, target_normals, target_features, target_keypoints_indices, m_scale_values_Kinect, m_alpha_kinect);
    PointCloudT::Ptr target_keypoints(new PointCloudT);
    Preprocessing::extract_indices(target, target_keypoints_indices, target_keypoints);
 
-   ROS_INFO("Found the persistent features for the target cloud: %zu", target_keypoints->size());
 
-
-   /*sensor_msgs::PointCloud2 msg_s_keypoint;
+   sensor_msgs::PointCloud2 msg_s_keypoint;
    pcl::toROSMsg(*source_keypoints, msg_s_keypoint);
    msg_s_keypoint.fields = ros_cloud->fields;
    msg_s_keypoint.header = ros_cloud->header;
@@ -128,7 +115,7 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    pcl::toROSMsg(*target_keypoints, msg_t_keypoint);
    msg_t_keypoint.fields = ros_cloud->fields;
    msg_t_keypoint.header = ros_cloud->header;
-   this->m_pub_target_keypoints.publish(msg_t_keypoint);*/
+   this->m_pub_target_keypoints.publish(msg_t_keypoint);
 
    /**
     Now that we have the keypoints along with their features both from source and target, we need to estimate the correspondance and
@@ -152,7 +139,7 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    rejector.setInputCorrespondences(correspondences);
    rejector.getCorrespondences(*corr_filtered);
 
-   ROS_INFO("Number of correspondences is : %zu", corr_filtered->size());
+   // The below line somehow didnt work!
    //estimate_correspondances(source_features, target_features, source_keypoints, target_keypoints, corr_filtered);
 
    /**
@@ -166,7 +153,6 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
    /**
      Transform the source point cloud given the alignment
      */
-
 
    pcl::transformPointCloud(*source, *source, transformation);
 
@@ -209,13 +195,11 @@ void ICPAlgorithm::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
 void ICPAlgorithm::find_multiscale_persistent_features(PointCloudT::Ptr &input_cloud,
                                                        PointCloudNormal::Ptr& input_cloud_normals,
                                                        FeatureCloud::Ptr& features,
-                                                       std::shared_ptr<std::vector<int>>& indices) {
+                                                       std::shared_ptr<std::vector<int>>& indices,
+                                                       std::vector<float> & scale_values, const float alpha) {
     pcl::MultiscaleFeaturePersistence<PointT, Feature> feature_persistence;
-    std::vector<float> scale_values;
-    for (float x = 1.0f; x < 3.5f; x += 0.50f)
-      scale_values.push_back(x / 100.0f);
     feature_persistence.setScalesVector(scale_values);
-    feature_persistence.setAlpha(0.8f);
+    feature_persistence.setAlpha(alpha);
     pcl::FPFHEstimation<PointT, pcl::Normal, Feature>::Ptr fpfh_estimation(new pcl::FPFHEstimation<PointT, pcl::Normal, Feature>());
     fpfh_estimation->setInputCloud(input_cloud);
     fpfh_estimation->setInputNormals(input_cloud_normals);
