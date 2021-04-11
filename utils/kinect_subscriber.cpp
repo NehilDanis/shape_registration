@@ -5,7 +5,7 @@
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
 #include <iostream>
-#include "shape_registration/preprocessing.hpp"
+#include "shape_registration/utils/preprocessing.hpp"
 
 // parameters which is required in the preprocessing phase
 namespace  {

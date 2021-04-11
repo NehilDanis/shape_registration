@@ -1,4 +1,4 @@
-#include "shape_registration/plane_segmentation.hpp"
+#include "shape_registration/utils/plane_segmentation.hpp"
 #include <pcl/io/pcd_io.h>
 
 PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
@@ -7,17 +7,19 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
   nh->getParam("plane_segmentation/plane_segmentation_threshold_for_RGBD", m_threshold_for_RGBD_plane_seg);
   nh->getParam("plane_segmentation/input_path_arm_data", m_CT_arm_input_path);
   nh->getParam("plane_segmentation/output_path_segmented_arm_data", m_segmented_CT_arm_output_path);
+  nh->getParam("plane_segmentation/input_path_artery_data", m_CT_artery_input_path);
+  nh->getParam("plane_segmentation/output_path_segmented_artery_data", m_segmented_CT_artery_output_path);
 
   PointCloudT::Ptr cloud (new PointCloudT);
   PointCloudT::Ptr extracted_cloud (new PointCloudT);
 
-  if (pcl::io::loadPCDFile<PointT> (m_CT_arm_input_path, *cloud) == -1) //* load the file
+  if (pcl::io::loadPCDFile<PointT> (m_CT_artery_input_path, *cloud) == -1) //* load the file
   {
     PCL_ERROR ("Couldn't read file \n");
   }
 
   //extracted_cloud = Preprocessing::extract_plane(cloud, m_threshold_for_CT_plane_seg);
-  //pcl::io::savePCDFile(m_segmented_CT_arm_output_path, *extracted_cloud);
+  //pcl::io::savePCDFile(m_segmented_CT_artery_output_path, *extracted_cloud);
 
   this->m_sub = nh->subscribe("/filtered_pointcloud", 30, &PlaneSegmentation::compute, this);
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/plane_segmented_data", 30);

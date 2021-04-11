@@ -2,7 +2,7 @@
 #define PLANE_SEGMENTATION_HPP
 
 #include <iostream>
-#include "shape_registration/preprocessing.hpp"
+#include "shape_registration/utils/preprocessing.hpp"
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
@@ -33,6 +33,8 @@ private:
   double m_threshold_for_RGBD_plane_seg;
   std::string m_CT_arm_input_path;
   std::string m_segmented_CT_arm_output_path;
+  std::string m_CT_artery_input_path;
+  std::string m_segmented_CT_artery_output_path;
 
 };
 

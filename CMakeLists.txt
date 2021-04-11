@@ -33,15 +33,19 @@ catkin_package(
 
 include_directories(
   include
+  algorithms/include
+  utils/include
   ${catkin_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
 )
 
-add_executable(preprocessing_node src/kinect_subscriber.cpp src/preprocessing.cpp)
+add_executable(preprocessing_node utils/kinect_subscriber.cpp utils/preprocessing.cpp)
 
-add_executable(plane_segmentation_node src/plane_segmentation.cpp src/preprocessing.cpp)
+add_executable(plane_segmentation_node utils/plane_segmentation.cpp utils/preprocessing.cpp)
 
-add_executable(registration_node src/icp_algorithm.cpp src/preprocessing.cpp)
+add_executable(registration_node src/mri_camera_matching.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
+
+add_executable(arm_tracking_node src/arm_tracking.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
 
 
 target_link_libraries(preprocessing_node
@@ -58,5 +62,11 @@ target_link_libraries(registration_node
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
  )
+
+target_link_libraries(arm_tracking_node
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
+
 
 
