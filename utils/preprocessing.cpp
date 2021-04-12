@@ -120,12 +120,18 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   auto b = plane->values[1];
   auto c = plane->values[2];
   auto d = plane->values[3];
+  //unsigned int num_points = 0;
   for(const auto &point : cloud_outliers->points) {
     float plane_side = a * point._PointXYZ::x + b * point._PointXYZ::y + c * point._PointXYZ::z + d;
     if(plane_side < 0) {
       cloud_outliers_one_side_plane->points.push_back(point);
+      //num_points++;
     }
   }
+
+  //cloud_outliers_one_side_plane->width = num_points;
+  //cloud_outliers_one_side_plane->height = 1;
+
 
   return  cloud_outliers_one_side_plane;
 }
