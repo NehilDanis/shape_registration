@@ -40,6 +40,10 @@ private:
   ros::Publisher m_pub;
   ros::Publisher m_pub_transformed_source;
   ros::Publisher m_pub_artery;
+  ros::Publisher m_pub_source;
+  ros::Publisher m_pub_source_keypoint;
+  ros::Publisher m_pub_target;
+  ros::Publisher m_pub_target_keypoint;
   std::string m_data_path;
   std::string m_artery_data_path;
   PointCloudT m_source_cloud;

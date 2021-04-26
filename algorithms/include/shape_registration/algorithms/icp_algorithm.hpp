@@ -31,7 +31,12 @@ public:
   ICPAlgorithm(int max_num_iter);
   PointCloudT compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
   Matrix4 get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
-  pcl::IterativeClosestPoint<PointT, PointT> get_ICP_obj() {return this->icp;}
+  inline pcl::IterativeClosestPoint<PointT, PointT> get_ICP_obj() {return this->icp;}
+  inline PointCloudT::Ptr get_source_keypoints() { return this->m_source_keypoints; }
+  inline PointCloudT::Ptr get_target_keypoints() { return this->m_target_keypoints; }
+  inline PointCloudT::Ptr get_source_non_keypoints() { return this->m_source_non_keypoints; }
+  inline PointCloudT::Ptr get_target_non_keypoints() { return this->m_target_non_keypoints; }
+
 
 private:
 
@@ -61,9 +66,13 @@ private:
   int m_max_num_iter;
   std::vector<float> m_scale_values_MRI{1.0/100.0, 1.5/100.0, 2.0/100.0, 2.5/100.0, 3.0/100.0};
   std::vector<float> m_scale_values_Kinect{1.0/100.0, 1.5/100.0, 2.0/100.0, 2.5/100.0, 3.0/100.0};
-  float m_alpha_MRI = 0.8f;
-  float m_alpha_kinect = 0.3f;
+  float m_alpha_MRI = 0.9f;
+  float m_alpha_kinect = 0.7f;
   pcl::IterativeClosestPoint<PointT, PointT> icp;
+  PointCloudT::Ptr m_source_keypoints;
+  PointCloudT::Ptr m_target_keypoints;
+  PointCloudT::Ptr m_source_non_keypoints;
+  PointCloudT::Ptr m_target_non_keypoints;
 };
 
 #endif // ICP_ALGORITHM_H

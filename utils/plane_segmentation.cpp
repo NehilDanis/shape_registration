@@ -10,8 +10,8 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
   nh->getParam("plane_segmentation/input_path_artery_data", m_CT_artery_input_path);
   nh->getParam("plane_segmentation/output_path_segmented_artery_data", m_segmented_CT_artery_output_path);
 
-  PointCloudT::Ptr cloud (new PointCloudT);
-  /*PointCloudT::Ptr extracted_cloud (new PointCloudT);
+  /*PointCloudT::Ptr cloud (new PointCloudT);
+  PointCloudT::Ptr extracted_cloud (new PointCloudT);
 
   if (pcl::io::loadPCDFile<PointT> (m_CT_arm_input_path, *cloud) == -1) // load the file
   {
@@ -21,7 +21,7 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
   extracted_cloud = Preprocessing::extract_plane(cloud, m_threshold_for_CT_plane_seg);
   pcl::io::savePCDFile(m_segmented_CT_arm_output_path, *extracted_cloud);*/
 
-  this->m_sub = nh->subscribe("/filtered_pointcloud", 30, &PlaneSegmentation::compute, this);
+  this->m_sub = nh->subscribe("/points_created", 30, &PlaneSegmentation::compute, this);
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/plane_segmented_data", 30);
 
 }

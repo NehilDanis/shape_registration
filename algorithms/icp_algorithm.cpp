@@ -3,6 +3,7 @@
 #include <pcl/common/common.h>
 #include <string>
 #include <cmath>
+#include <pcl/registration/default_convergence_criteria.h>
 
 ICPAlgorithm::ICPAlgorithm(int max_num_iter)
 {
@@ -11,6 +12,8 @@ ICPAlgorithm::ICPAlgorithm(int max_num_iter)
 
 Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
   // Before applying icp, it is better to find an initial alignment, between the clouds.
+
+  double start_calc_normals =ros::Time::now().toSec();
   /**
     Calculate the normals for source
     */
@@ -23,11 +26,15 @@ Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, Point
    PointCloudNormal::Ptr target_normals;
    calculateNormals(target, target_normals);
 
+   double finish_calc_normals =ros::Time::now().toSec();
+   ROS_INFO("Time takes for calculating normals of the target and source clouds: %f", finish_calc_normals - start_calc_normals);
+
   /**
     Now we want to find the persistent keypoints from both source and target clouds in different scales.
     Then we can use these keypoints and their features while finding the initial alignment.
     */
 
+   double start_calc_persistent_feat =ros::Time::now().toSec();
    /**
      FIND PERSISTENT FEATURES FOR THE SOURCE CLOUD
      */
@@ -36,7 +43,8 @@ Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, Point
    auto source_keypoints_indices = pcl::make_shared<std::vector<int>>();
    find_multiscale_persistent_features(source, source_normals, source_features, source_keypoints_indices, m_scale_values_MRI, m_alpha_MRI);
    PointCloudT::Ptr source_keypoints(new PointCloudT);
-   Preprocessing::extract_indices(source, source_keypoints_indices, source_keypoints);
+   PointCloudT::Ptr source_non_keypoints(new PointCloudT);
+   Preprocessing::extract_indices(source, source_keypoints_indices, source_keypoints, source_non_keypoints);
 
    /**
     FIND PERSISTENT FEATURES FOR THE TARGET CLOUD
@@ -46,12 +54,21 @@ Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, Point
    auto target_keypoints_indices = pcl::make_shared<std::vector<int>>();
    find_multiscale_persistent_features(target, target_normals, target_features, target_keypoints_indices, m_scale_values_Kinect, m_alpha_kinect);
    PointCloudT::Ptr target_keypoints(new PointCloudT);
-   Preprocessing::extract_indices(target, target_keypoints_indices, target_keypoints);
+   PointCloudT::Ptr target_non_keypoints(new PointCloudT);
+   Preprocessing::extract_indices(target, target_keypoints_indices, target_keypoints, target_non_keypoints);
+
+   double finish_calc_persistent_feat =ros::Time::now().toSec();
+
+   ROS_INFO("Time takes for calculating persistent features: %f", finish_calc_persistent_feat - start_calc_persistent_feat);
+   ROS_INFO("The number of persistent features found in source: %zu", source_keypoints->size());
+   ROS_INFO("The number of persistent features found in target: %zu", target_keypoints->size());
 
    /**
     Now that we have the keypoints along with their features both from source and target, we need to estimate the correspondance and
     drop the ones which are not likely.
     */
+
+   double start_calc_correspondences =ros::Time::now().toSec();
 
    pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
    pcl::registration::CorrespondenceEstimation<Feature, Feature> cest;
@@ -64,7 +81,7 @@ Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, Point
    pcl::CorrespondencesPtr corr_filtered(new pcl::Correspondences);
    rejector.setInputSource(source_keypoints);
    rejector.setInputTarget(target_keypoints);
-   rejector.setInlierThreshold(2.5/100.0);
+   rejector.setInlierThreshold(0.25);
    rejector.setMaximumIterations(1000000);
    rejector.setRefineModel(false);
    rejector.setInputCorrespondences(correspondences);
@@ -73,6 +90,9 @@ Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, Point
    // The below line somehow didnt work!
    //estimate_correspondances(source_features, target_features, source_keypoints, target_keypoints, corr_filtered);
 
+   double finish_calc_correspondences =ros::Time::now().toSec();
+
+   ROS_INFO("Time takes for calculating the feature correspondences: %f", finish_calc_correspondences - start_calc_correspondences);
    /**
     Find the initial alignment between source and the target
     */
@@ -80,6 +100,11 @@ Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, Point
    pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;
    pcl::registration::TransformationEstimationSVD<PointT,PointT> transformation_est_SVD;
    transformation_est_SVD.estimateRigidTransformation(*source_keypoints, *target_keypoints, *corr_filtered, transformation);
+
+   this->m_source_keypoints = source_keypoints;
+   this->m_target_keypoints = target_keypoints;
+   this->m_source_non_keypoints = source_non_keypoints;
+   this->m_target_non_keypoints = target_non_keypoints;
 
    return transformation;
 }
@@ -92,7 +117,12 @@ PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &ta
 
   // Set the maximum number of iterations
   // It is 10 by default
-  this->icp.setMaximumIterations(this->m_max_num_iter);
+  //this->icp.setMaxCorrespondenceDistance (0.005);
+  this->icp.setMaximumIterations(500);
+  //this->icp.setEuclideanFitnessEpsilon(1e-5);
+
+  // Set convergence criteria
+  //this->icp.setTransformationEpsilon (1e-8);
 
   // Create a new point cloud which will represent the result point cloud after
   // iteratively applying transformations to the input source cloud, to make it
@@ -105,7 +135,7 @@ PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &ta
   ROS_INFO("has converged : %d", this->icp.hasConverged());
   ROS_INFO("score : %f", this->icp.getFitnessScore());
 
-  if(this->icp.hasConverged()) {
+  if(this->icp.hasConverged() && this->icp.getFitnessScore() < 0.0004) {
     return final_cloud;
   }
   final_cloud.clear();

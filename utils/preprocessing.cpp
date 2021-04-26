@@ -79,6 +79,20 @@ void extract_indices(const PointCloudT::Ptr& source,
 
 }
 
+void extract_indices(const PointCloudT::Ptr& source,
+                          std::shared_ptr<std::vector<int>>& indices_to_extract,
+                          PointCloudT::Ptr& output_inliners, PointCloudT::Ptr& output_outliners){
+  // Extract inliers
+  pcl::ExtractIndices<PointT> extract;
+  extract.setInputCloud(source);
+  extract.setIndices(indices_to_extract);
+  extract.setNegative(false);     // Extract the inliers
+  extract.filter(*output_inliners); // cloud_inliers contains the plane
+
+  extract.setNegative(true);     // Extract the outliners
+  extract.filter(*output_outliners);
+
+}
 
 PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) {
 
