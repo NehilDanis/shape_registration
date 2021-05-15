@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(PCL 1.11.1 REQUIRED)
+find_package(Yaml-cpp 0.6.0 REQUIRED)
 #find_package(OpenCV 4.5.2 REQUIRED core imgproc calib3d video features2d highgui)
 #message("??? ${OpenCV_LIBS}")
 #message("??? END")
@@ -22,10 +23,11 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   image_transport
   cv_bridge
-)
+  geometry_msgs
+  tf2
+  tf2_ros)
 
 find_package(OpenCV 3 REQUIRED)
-
 
 catkin_package(
 #  INCLUDE_DIRS include
@@ -37,6 +39,7 @@ catkin_package(
   sensor_msgs
   image_transport
   cv_bridge
+  geometry_msgs
 #  DEPENDS system_lib
 )
 
@@ -52,6 +55,7 @@ include_directories(
 
 #set(OpenCV_LIBS opencv_core opencv_imgproc opencv_calib3d opencv_video opencv_features2d opencv_highgui)
 
+add_executable(calibration_checker_node utils/calibration_checker_node.cpp)
 
 add_executable(ROI_cropping_node utils/crop_roi.cpp)
 
@@ -62,6 +66,12 @@ add_executable(plane_segmentation_node utils/plane_segmentation.cpp utils/prepro
 add_executable(registration_node src/mri_camera_matching.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
 
 add_executable(arm_tracking_node src/arm_tracking.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
+
+target_link_libraries(calibration_checker_node
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
 
 target_link_libraries(ROI_cropping_node
    ${OpenCV_LIBRARIES}
@@ -85,6 +95,7 @@ target_link_libraries(registration_node
    ${OpenCV_LIBS}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
  )
 
 target_link_libraries(arm_tracking_node
