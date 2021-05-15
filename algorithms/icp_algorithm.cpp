@@ -7,10 +7,11 @@
 
 ICPAlgorithm::ICPAlgorithm(int max_num_iter)
 {
+  ROS_INFO("hey hey hey initializing");
   this->m_max_num_iter = max_num_iter;
 }
 
-Matrix4 ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
+Matrix ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
   // Before applying icp, it is better to find an initial alignment, between the clouds.
 
   double start_calc_normals =ros::Time::now().toSec();
