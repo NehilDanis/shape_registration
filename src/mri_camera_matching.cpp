@@ -4,18 +4,38 @@
 #include <pcl/common/common.h>
 #include <string>
 #include <cmath>
+#include <yaml-cpp/yaml.h>
+
 
 MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
 {
   int max_num_iter;
+  std::string calibration_file_path;
   nh->getParam("icp_registration/voxel_grid_filter_voxel_size", m_voxel_size);
   nh->getParam("icp_registration/icp_max_num_of_iterations", max_num_iter);
   nh->getParam("icp_registration/ct_arm_data_path", m_data_path);
   nh->getParam("icp_registration/ct_artery_data_path", m_artery_data_path);
+  nh->getParam("icp_registration/calibration_file_path", calibration_file_path);
 
-  std::shared_ptr<ICPAlgorithm> device(new ICPAlgorithm(max_num_iter));
+  // read the calibration data from yaml file
 
-  this->shape_registration = device;
+  YAML::Node config = YAML::LoadFile(calibration_file_path);
+  std::cout << config << std::endl;
+  /*transformStamped.transform.translation.x = config["transformation"]["x"].as<double_t>();
+  transformStamped.transform.translation.y = config["transformation"]["y"].as<double_t>();
+  transformStamped.transform.translation.z = config["transformation"]["z"].as<double_t>();
+
+  transformStamped.transform.rotation.x = config["transformation"]["qx"].as<double_t>();
+  transformStamped.transform.rotation.y = config["transformation"]["qy"].as<double_t>();
+  transformStamped.transform.rotation.z = config["transformation"]["qz"].as<double_t>();
+  transformStamped.transform.rotation.w = config["transformation"]["qw"].as<double_t>();*/
+
+
+  // Create ICP algorithm object
+
+  this->shape_registration = std::make_shared<ICPAlgorithm>(max_num_iter);
+
+  std::cout << "reached here!" << std::endl;
 
   PointCloudT::Ptr cloud (new PointCloudT);
 
@@ -73,6 +93,7 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
 
   double begin_secs =ros::Time::now().toSec();
   ROS_INFO("HEYYYYY");
+  //std::cout << transformStamped << std::endl;
   PointCloudT::Ptr target (new PointCloudT);
 
   // Create the source
@@ -121,7 +142,7 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
   ////
 
   double feature_before =ros::Time::now().toSec();
-  Matrix4 transformation = this->shape_registration->get_initial_transformation(source, target);
+  Matrix transformation(this->shape_registration->get_initial_transformation(source, target));
   double feature_after =ros::Time::now().toSec();
 
   ROS_INFO("the duration of the feature computing function is: %f", feature_after - feature_before);
@@ -203,6 +224,9 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
      msg_artery.fields = ros_cloud->fields;
      msg_artery.header = ros_cloud->header;
      this->m_pub_artery.publish(msg_artery);
+
+     // Transform the artery to the robot base coordinates
+
    }
 
    double end_secs =ros::Time::now().toSec();

@@ -1,4 +1,6 @@
-// ROS related
+/*******************************************************************
+* ROS RELATED
+*******************************************************************/
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -6,21 +8,36 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 
-// OpenCV related
+/*******************************************************************
+* OPENCV RELATED
+*******************************************************************/
 #include <opencv2/highgui/highgui.hpp>
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 
-//pcl related
+/*******************************************************************
+* PCL RELATED
+*******************************************************************/
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+/*******************************************************************
+* SENSOR_FUSION INCLUDES
+*******************************************************************/
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+
+/*******************************************************************
+* STD INCLUDES
+*******************************************************************/
 #include <iostream>
 #include <cmath>
 
 namespace  {
+  bool box_selected = false;
   bool leftDown=false,leftup=false;
   cv::Point cor1;
   cv::Point cor2;
@@ -35,7 +52,6 @@ namespace  {
   sensor_msgs::PointCloud2 msg_n;
   ros::Publisher m_pub;
   ros::Publisher image_pub;
-
 }
 
 static void onMouse(int event, int x, int y, int, void*) {
@@ -68,31 +84,10 @@ static void onMouse(int event, int x, int y, int, void*) {
       cv::imshow("view", m_img);
       leftDown=false;
       leftup=false;
+      box_selected = true;
       //cv::destroyWindow("Cropped Image");
       return;
     }
-}
-
-
-void crop_rgb_image(const sensor_msgs::ImageConstPtr& msg)
-{
-  try
-  {
-    m_img = cv_bridge::toCvCopy(msg)->image;
-    /*double min;
-    double max;
-    cv::minMaxIdx(m_img, &min, &max);
-    cv::Mat adjMap;
-    cv::convertScaleAbs(m_img, adjMap, 255 / max);*/
-    cv::imshow("view", m_img);
-    cv::setMouseCallback("view", onMouse);
-    cv::waitKey(0);
-    cv::destroyWindow("view");
-  }
-  catch (cv_bridge::Exception& e)
-  {
-    ROS_ERROR("Could not convert from '%s' to 'bgra8'.", msg->encoding.c_str());
-  }
 }
 
 void create_depth_crop(const sensor_msgs::ImageConstPtr& msg) {
@@ -104,15 +99,6 @@ void create_depth_crop(const sensor_msgs::ImageConstPtr& msg) {
 
     //std::cout << "the depth value in (350, 250) is : " << depth_img.at<float>(250, 350) * 1000 << std::endl;
 
-
-    /*int height = int(cor2.y - cor1.y);
-    int width = int(cor2.x - cor1.x);
-    cv::Rect myROI(int(cor1.x), int(cor1.y), width, height);
-    cv_ptr->image = depth_img(myROI);
-
-    sensor_msgs::ImagePtr ros_image = cv_ptr->toImageMsg();
-    ros_image->header = msg->header;
-    image_pub.publish(ros_image);*/
     pcl::PointCloud<pcl::PointXYZ> cloud;
 
     cv::Mat_<double> point;
@@ -120,16 +106,12 @@ void create_depth_crop(const sensor_msgs::ImageConstPtr& msg) {
     for (int i = int(cor1.x); i < int(cor2.x); i ++) {
       for (int j = int(cor1.y); j < int(cor2.y); j ++) {
         float depth = depth_img.at<float>(j,i) * 1000;
-        //std::cout << depth << std::endl;
-        //std::cout << depth*1000 << std::endl;
         point = cv::Mat::zeros(3, 1, CV_32FC1);
         pcl::PointXYZ cloud_point;
         point(0, 0) = depth * (i - 323.36) / 504.55;
         point(1, 0) = depth * (j - 326.18) / 504.58;
         point(2, 0) = depth;
-        //std::cout << "Point before : " << point << std::endl;
-        //point = p_depth.inv()*point;
-        //std::cout << "Point after : " << point << std::endl;
+
         point = point / 1000;
         cloud_point.x = point(0, 0);
         cloud_point.y = point(1, 0);
@@ -150,6 +132,62 @@ void create_depth_crop(const sensor_msgs::ImageConstPtr& msg) {
 }
 
 
+void crop_rgb_image(const sensor_msgs::ImageConstPtr& color_msg, const sensor_msgs::ImageConstPtr& depth_msg)
+{
+  if(!box_selected){
+    try
+    {
+      m_img = cv_bridge::toCvCopy(color_msg, sensor_msgs::image_encodings::BGR8)->image;
+      /*double min;
+      double max;
+      cv::minMaxIdx(m_img, &min, &max);
+      cv::Mat adjMap;
+      cv::convertScaleAbs(m_img, adjMap, 255 / max);*/
+      cv::imshow("view", m_img);
+      cv::setMouseCallback("view", onMouse);
+      cv::waitKey(0);
+      cv::destroyWindow("view");
+    }
+    catch (cv_bridge::Exception& e)
+    {
+      ROS_ERROR("Could not convert from '%s' to 'bgra8'.", color_msg->encoding.c_str());
+    }
+
+  }
+  try
+  {
+    cv_bridge::CvImagePtr cv_ptr_depth;
+    cv_ptr_depth = cv_bridge::toCvCopy(depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+    depth_img = cv_ptr_depth->image.clone();
+
+    //std::cout << "the depth value in (350, 250) is : " << depth_img.at<float>(250, 350) * 1000 << std::endl;
+
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+
+    int cloud_id = 0;
+    for (int i = int(cor1.x); i < int(cor2.x); i ++) {
+      for (int j = int(cor1.y); j < int(cor2.y); j ++) {
+        float depth = cv_ptr_depth->image.at<float>(static_cast<int>(j), static_cast<int>(i));
+        pcl::PointXYZ cloud_point;
+        cloud_point.x = depth * (i - 960.0751953125f) / 913.50146484375f;
+        cloud_point.y = depth * (j - 551.0783081054688f) / 913.50146484375f;
+        cloud_point.z = depth;
+        cloud.push_back(cloud_point);
+        cloud_id +=1;
+      }
+    }
+    pcl::toROSMsg(cloud, msg_n);
+    msg_n.header.frame_id = "rgb_camera_link";
+    msg_n.header.stamp = ros::Time::now();
+    m_pub.publish(msg_n);
+  }
+  catch (cv_bridge::Exception& e)
+  {
+    ROS_ERROR("Could not convert from '%s' to 'bgra8'.", depth_msg->encoding.c_str());
+  }
+}
+
+
 int main(int argc, char **argv)
 {
   cv::namedWindow("view");
@@ -157,48 +195,35 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "image_listener");
   ros::NodeHandle nh;
 
-  sensor_msgs::ImageConstPtr frame = ros::topic::waitForMessage<sensor_msgs::Image>("/k4a/depth/image_rect");
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+  typedef message_filters::Synchronizer<sync_pol> Sync;
+  boost::shared_ptr<Sync> sync;
+  message_filters::Subscriber<sensor_msgs::Image> depth_sub;
+  message_filters::Subscriber<sensor_msgs::Image> color_sub;
+
+  depth_sub.subscribe(nh, "/k4a/depth_to_rgb/image_rect", 1);
+  color_sub.subscribe(nh, "/k4a/rgb/image_rect_color", 1);
+  sync.reset(new Sync(sync_pol(5),color_sub, depth_sub));
+  sync->registerCallback(boost::bind(crop_rgb_image, _1, _2));
+
+  /*sensor_msgs::ImageConstPtr frame = ros::topic::waitForMessage<sensor_msgs::Image>("/k4a/depth/image_rect");
   if(frame != nullptr){
     crop_rgb_image(frame);
-  }
-
-  /*cv::Mat g_rgb_inv;
-  cv::invert(g_rgb, g_rgb_inv, cv::DECOMP_SVD);
-
-  cv::Mat p_rgb_inv = p_rgb.inv();
-
-  cv::Mat_<double> cor_1_tmp(3,1);
-  cor_1_tmp(0,0)=cor1.x;
-  cor_1_tmp(1,0)=cor1.y;
-  cor_1_tmp(2,0)=1.0;
-
-  cv::Mat_<double> res_1 = p_depth * p_rgb_inv * cor_1_tmp;
-
-  cv::Mat_<double> cor_2_tmp(3,1);
-  cor_2_tmp(0,0)=cor2.x;
-  cor_2_tmp(1,0)=cor2.y;
-  cor_2_tmp(2,0)=1.0;
-
-  cv::Mat_<double> res_2 = p_depth * p_rgb_inv * cor_2_tmp;
-
-  cor1_df.x = res_1(0, 0);
-  cor1_df.y = res_1(1, 0);
-
-  cor2_df.x = res_2(0, 0);
-  cor2_df.y = res_2(1, 0);*/
-
-  //nh.shutdown();
+  }*/
 
   m_pub = nh.advertise<sensor_msgs::PointCloud2>("/points_created", 5);
   image_pub = nh.advertise<sensor_msgs::Image>("/image_cropped", 2);
 
 
-  ros::Subscriber m_sub = nh.subscribe("/k4a/depth/image_rect", 1, create_depth_crop);
+  /*ros::Subscriber m_sub = nh.subscribe("/k4a/depth/image_rect", 1, create_depth_crop);
   ros::Rate r(10); // 10 hz
   while(1)
   {
     ros::spinOnce();
     r.sleep();
-  }
+  }*/
+
+  ros::spin();
+  return 0;
 
 }
