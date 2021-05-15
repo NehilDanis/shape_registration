@@ -10,11 +10,10 @@
 #include "shape_registration/utils/preprocessing.hpp"
 #include "shape_registration/algorithms/icp_algorithm.hpp"
 
-using Matrix4 = Eigen::Matrix<float, 4, 4>;
 class ArmTracking
 {
 public:
-  ArmTracking(ros::NodeHandlePtr nh);
+  ArmTracking(ros::NodeHandle *nh);
 
 private:
   void compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud);
