@@ -3,6 +3,11 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <geometry_msgs/Point32.h>
+#include <geometry_msgs/TransformStamped.h>
+
+
 #include <iostream>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
@@ -11,7 +16,7 @@
 #include "shape_registration/algorithms/icp_algorithm.hpp"
 
 #include <vector>
-using Matrix4 = Eigen::Matrix<float, 4, 4>;
+
 using PointCloudNormal = pcl::PointCloud<pcl::Normal>;
 using Feature = pcl::FPFHSignature33;
 using FeatureCloud = pcl::PointCloud<Feature>;
@@ -49,6 +54,7 @@ private:
   PointCloudT m_source_cloud;
   PointCloudT m_target_cloud;
   PointCloudT m_artery_cloud;
+  geometry_msgs::TransformStamped transformStamped;
 };
 
 #endif // MRI_CAMERA_MATCHING_HPP
