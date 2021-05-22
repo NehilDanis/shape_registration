@@ -39,11 +39,10 @@ void ArmTracking::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
 
     // once both curr and prev frames are set then apply icp and find the transformation between the two frames
     this->m_icp->compute(this->m_prev_frame, this->m_curr_frame);
-    Matrix transformation(this->m_icp->get_ICP_obj().getFinalTransformation());
 
     // create the transformed frame by applying the transformation found from ICP to the previous frame
     PointCloudT::Ptr transformed_frame(new PointCloudT);
-    pcl::transformPointCloud(*this->m_prev_frame, *transformed_frame, transformation);
+    pcl::transformPointCloud(*this->m_prev_frame, *transformed_frame, this->m_icp->get_ICP_obj().getFinalTransformation());
 
     // publish current frame previous frame and the transformed previous frame
 

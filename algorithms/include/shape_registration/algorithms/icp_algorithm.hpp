@@ -18,7 +18,7 @@
 #include <pcl/console/parse.h>
 
 #include <vector>
-using Matrix = Eigen::Matrix<float, 4, 4, Eigen::DontAlign>;
+//using Matrix = Eigen::Matrix<float, 4, 4>;
 using PointCloudNormal = pcl::PointCloud<pcl::Normal>;
 using Feature = pcl::FPFHSignature33;
 using FeatureCloud = pcl::PointCloud<Feature>;
@@ -30,12 +30,16 @@ public:
 
   ICPAlgorithm(int max_num_iter);
   PointCloudT compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
-  Matrix get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
+  //Matrix get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
+  void get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
   inline pcl::IterativeClosestPoint<PointT, PointT> get_ICP_obj() {return this->icp;}
   inline PointCloudT::Ptr get_source_keypoints() { return this->m_source_keypoints; }
   inline PointCloudT::Ptr get_target_keypoints() { return this->m_target_keypoints; }
   inline PointCloudT::Ptr get_source_non_keypoints() { return this->m_source_non_keypoints; }
   inline PointCloudT::Ptr get_target_non_keypoints() { return this->m_target_non_keypoints; }
+
+public:
+  pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;
 
 
 private:

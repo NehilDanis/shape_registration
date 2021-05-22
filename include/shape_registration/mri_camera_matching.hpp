@@ -45,6 +45,7 @@ private:
   ros::Publisher m_pub;
   ros::Publisher m_pub_transformed_source;
   ros::Publisher m_pub_artery;
+  ros::Publisher m_pub_artery_robot_base;
   ros::Publisher m_pub_source;
   ros::Publisher m_pub_source_keypoint;
   ros::Publisher m_pub_target;
@@ -55,6 +56,7 @@ private:
   PointCloudT m_target_cloud;
   PointCloudT m_artery_cloud;
   geometry_msgs::TransformStamped transformStamped;
+  Eigen::Matrix4d transformation_to_robot_base;
 };
 
 #endif // MRI_CAMERA_MATCHING_HPP

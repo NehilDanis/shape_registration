@@ -134,6 +134,7 @@ void create_depth_crop(const sensor_msgs::ImageConstPtr& msg) {
 
 void crop_rgb_image(const sensor_msgs::ImageConstPtr& color_msg, const sensor_msgs::ImageConstPtr& depth_msg)
 {
+  ROS_INFO("hey hey");
   if(!box_selected){
     try
     {
@@ -176,6 +177,7 @@ void crop_rgb_image(const sensor_msgs::ImageConstPtr& color_msg, const sensor_ms
         cloud_id +=1;
       }
     }
+    std::cout << "the point cloud created" << std::endl;
     pcl::toROSMsg(cloud, msg_n);
     msg_n.header.frame_id = "rgb_camera_link";
     msg_n.header.stamp = ros::Time::now();
@@ -211,7 +213,7 @@ int main(int argc, char **argv)
     crop_rgb_image(frame);
   }*/
 
-  m_pub = nh.advertise<sensor_msgs::PointCloud2>("/points_created", 5);
+  m_pub = nh.advertise<sensor_msgs::PointCloud2>("/points_created", 1);
   image_pub = nh.advertise<sensor_msgs::Image>("/image_cropped", 2);
 
 

@@ -1,10 +1,14 @@
 #include "shape_registration/mri_camera_matching.hpp"
 #include "shape_registration/algorithms/icp_algorithm.hpp"
 #include <pcl/io/ply_io.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/common/pca.h>
 #include <pcl/common/common.h>
 #include <string>
 #include <cmath>
 #include <yaml-cpp/yaml.h>
+#include <iostream>
+#include <fstream>
 
 
 MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
@@ -20,15 +24,22 @@ MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
   // read the calibration data from yaml file
 
   YAML::Node config = YAML::LoadFile(calibration_file_path);
-  std::cout << config << std::endl;
-  /*transformStamped.transform.translation.x = config["transformation"]["x"].as<double_t>();
-  transformStamped.transform.translation.y = config["transformation"]["y"].as<double_t>();
-  transformStamped.transform.translation.z = config["transformation"]["z"].as<double_t>();
+//  std::cout << "HEYYYYYYYYYYYYYYYYYYYY" << std::endl;
+//  std::cout << typeid(config).name() << std::endl;
+//  std::cout << typeid(config[0]).name() << std::endl;
+//  std::cout << config[0] << std::endl;
+  transformStamped.transform.rotation.x = -0.6533612462844834;
+  transformStamped.transform.rotation.y = -0.5924779514600383;
+  transformStamped.transform.rotation.z = 0.3022795994822185;
+  transformStamped.transform.rotation.w = 0.3615466811134804;
+  transformStamped.transform.translation.x = 1.2412607295249753;
+  transformStamped.transform.translation.y = 0.09654753630899422;
+  transformStamped.transform.translation.z = 0.5782754163858845;
 
-  transformStamped.transform.rotation.x = config["transformation"]["qx"].as<double_t>();
-  transformStamped.transform.rotation.y = config["transformation"]["qy"].as<double_t>();
-  transformStamped.transform.rotation.z = config["transformation"]["qz"].as<double_t>();
-  transformStamped.transform.rotation.w = config["transformation"]["qw"].as<double_t>();*/
+  transformation_to_robot_base << 0.1151938,  0.5556279, -0.8234124, 1.2412607295249753,
+      0.9927806, -0.0365077,  0.1142532, 0.09654753630899422,
+      0.0334213, -0.8306292, -0.5558221, 0.5782754163858845,
+      0, 0, 0, 1;
 
 
   // Create ICP algorithm object
@@ -77,6 +88,7 @@ MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/final_result", 30);
   this->m_pub_transformed_source = nh->advertise<sensor_msgs::PointCloud2>("/transformed_source", 30);
   this->m_pub_artery = nh->advertise<sensor_msgs::PointCloud2>("/artery", 30);
+  this->m_pub_artery_robot_base = nh->advertise<sensor_msgs::PointCloud2>("/artery_robot_base", 30);
   this->m_pub_source = nh->advertise<sensor_msgs::PointCloud2>("/source", 30);
   this->m_pub_source_keypoint = nh->advertise<sensor_msgs::PointCloud2>("/source_keypoint", 30);
   this->m_pub_target = nh->advertise<sensor_msgs::PointCloud2>("/target", 30);
@@ -90,6 +102,7 @@ MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
 }
 
 void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
+  static size_t saved_artery_file = 0;
 
   double begin_secs =ros::Time::now().toSec();
   ROS_INFO("HEYYYYY");
@@ -142,7 +155,7 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
   ////
 
   double feature_before =ros::Time::now().toSec();
-  Matrix transformation(this->shape_registration->get_initial_transformation(source, target));
+  this->shape_registration->get_initial_transformation(source, target);
   double feature_after =ros::Time::now().toSec();
 
   ROS_INFO("the duration of the feature computing function is: %f", feature_after - feature_before);
@@ -199,9 +212,9 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
      Transform the source point cloud given the alignment
      */
 
-   pcl::transformPointCloud(*source, *source, transformation);
+   pcl::transformPointCloud(*source, *source, this->shape_registration->transformation);
 
-   pcl::transformPointCloud(*artery, *artery, transformation);
+   pcl::transformPointCloud(*artery, *artery, this->shape_registration->transformation);
 
    sensor_msgs::PointCloud2 msg;
    pcl::toROSMsg(*source, msg);
@@ -225,8 +238,51 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
      msg_artery.header = ros_cloud->header;
      this->m_pub_artery.publish(msg_artery);
 
+     std::cout << "IN CAMERA COORD SYSTEM : " << std::endl;
+     for(const auto &point : *artery) {
+       std::cout << point << std::endl;
+     }
+
+
      // Transform the artery to the robot base coordinates
 
+     pcl::transformPointCloud(*artery, *artery, this->transformation_to_robot_base);
+
+     /*sensor_msgs::PointCloud2 msg_artery_robot_base;
+     pcl::toROSMsg(*artery, msg_artery_robot_base);
+     msg_artery_robot_base.fields = ros_cloud->fields;
+     msg_artery_robot_base.header = ros_cloud->header;
+     this->m_pub_artery_robot_base.publish(msg_artery);*/
+
+     if(saved_artery_file == 0) {
+       // Save the points to pcd file.
+       std::cout << "heyy artery file is saved" << std::endl;
+       /*pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.pcd", *artery);
+       pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base_downsampled.pcd", *(Preprocessing::voxel_grid_downsampling(artery, 0.01f)));*/
+
+
+       // find the eigen vectors
+
+       pcl::PCA<PointT> cpca = new pcl::PCA<PointT>;
+       cpca.setInputCloud(artery);
+
+       std::cout << cpca.getEigenVectors() << std::endl;
+
+       // create a txt file
+
+       ofstream myfile ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.txt");
+         if (myfile.is_open())
+         {
+           for(const auto &point : *artery) {
+             myfile << point._PointXYZ::x << " " << point._PointXYZ::y << " " << point._PointXYZ::z << "\n";
+           }
+           myfile.close();
+         }
+         else cout << "Unable to open file";
+
+
+       saved_artery_file += 1;
+     }
    }
 
    double end_secs =ros::Time::now().toSec();

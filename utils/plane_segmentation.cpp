@@ -22,18 +22,23 @@ PlaneSegmentation::PlaneSegmentation(ros::NodeHandle *nh)
   pcl::io::savePCDFile(m_segmented_CT_arm_output_path, *extracted_cloud);*/
 
   this->m_sub = nh->subscribe("/points_created", 30, &PlaneSegmentation::compute, this);
-  this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/plane_segmented_data", 30);
+  this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/plane_segmented_data", 1);
 
 }
 
 void PlaneSegmentation::compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud) {
+  ROS_INFO("Reached the plane segmentation level !!");
   PointCloudT::Ptr pcl_cloud (new PointCloudT);
   PointCloudT::Ptr segmented_cloud (new PointCloudT);
   pcl::fromROSMsg(*ros_cloud, *pcl_cloud);
 
+  ROS_INFO("Created cloud");
   segmented_cloud = Preprocessing::extract_plane(pcl_cloud, m_threshold_for_RGBD_plane_seg);
 
+  ROS_INFO("extracted plane from cloud");
   segmented_cloud = Preprocessing::statistical_filtering(segmented_cloud, 1.0);
+
+  ROS_INFO("applied statistical filter");
   if(segmented_cloud != nullptr) {
     sensor_msgs::PointCloud2 msg;
     pcl::toROSMsg(*segmented_cloud, msg);
@@ -44,6 +49,7 @@ void PlaneSegmentation::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
   else {
     ROS_INFO("No plane is found!");
   }
+  ROS_INFO("Finished plane segmentation!");
 }
 
 

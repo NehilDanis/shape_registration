@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.0.2)
 project(shape_registration)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++14)
+add_compile_options(-std=c++17)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 find_package(PCL 1.11.1 REQUIRED)
@@ -67,6 +67,8 @@ add_executable(registration_node src/mri_camera_matching.cpp algorithms/icp_algo
 
 add_executable(arm_tracking_node src/arm_tracking.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
 
+add_executable(pca_thing utils/find_pca_of_artery.cpp)
+
 target_link_libraries(calibration_checker_node
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
@@ -100,6 +102,12 @@ target_link_libraries(registration_node
 
 target_link_libraries(arm_tracking_node
    ${OpenCV_LIBS}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
+
+target_link_libraries(pca_thing
+   ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
  )

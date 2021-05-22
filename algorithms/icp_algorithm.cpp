@@ -11,7 +11,7 @@ ICPAlgorithm::ICPAlgorithm(int max_num_iter)
   this->m_max_num_iter = max_num_iter;
 }
 
-Matrix ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
+void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
   // Before applying icp, it is better to find an initial alignment, between the clouds.
 
   double start_calc_normals =ros::Time::now().toSec();
@@ -98,16 +98,13 @@ Matrix ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointC
     Find the initial alignment between source and the target
     */
 
-   pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;
    pcl::registration::TransformationEstimationSVD<PointT,PointT> transformation_est_SVD;
-   transformation_est_SVD.estimateRigidTransformation(*source_keypoints, *target_keypoints, *corr_filtered, transformation);
+   transformation_est_SVD.estimateRigidTransformation(*source_keypoints, *target_keypoints, *corr_filtered, this->transformation);
 
    this->m_source_keypoints = source_keypoints;
    this->m_target_keypoints = target_keypoints;
    this->m_source_non_keypoints = source_non_keypoints;
    this->m_target_non_keypoints = target_non_keypoints;
-
-   return transformation;
 }
 
 PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
