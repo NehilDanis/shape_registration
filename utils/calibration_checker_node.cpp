@@ -31,11 +31,13 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-/*******************************************************************
-* CUSTOM CLASS INCLUDES
-*******************************************************************/
-//#include <shape_registration/point_coordinate.h>
-//#include "shape_registration/point_coordinate.h"
+/**
+ * @brief The Fusion_and_Publish class
+ * This class finds the coordinates of all the corners in the chessboard in the camera coordinates and later on
+ * the transformation between camera coordinates and the robot base is read from the /home/nehil/.ros/easy_handeye/iiwa_azure_kinect_eye_on_base.yaml
+ * calibration file. Then the points will be transformed to the robot base, and this way we will know whether our handeye calibration works well or not.
+ */
+
 
 
 
@@ -43,33 +45,46 @@ class Fusion_and_Publish
 {
 public:
     Fusion_and_Publish();
-    void callback(const sensor_msgs::ImageConstPtr &depth_image, const sensor_msgs::ImageConstPtr &color_image);
+    void callback(const sensor_msgs::ImageConstPtr &depth_image, const sensor_msgs::ImageConstPtr &color_image,
+                  const sensor_msgs::CameraInfoConstPtr& cam_info_msg);
 
 private:
     ros::NodeHandle nh_;
-    //ros::Publisher xyz_pub_;
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub;
-    message_filters::Subscriber<sensor_msgs::Image> color_sub;
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> sync_pol;
     typedef message_filters::Synchronizer<sync_pol> Sync;
     boost::shared_ptr<Sync> sync;
+    message_filters::Subscriber<sensor_msgs::Image> depth_sub;
+    message_filters::Subscriber<sensor_msgs::Image> color_sub;
+    message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub;
+
     cv::Size board_size;
 };
 
 Fusion_and_Publish::Fusion_and_Publish()
 {
-    board_size = cv::Size(7, 6);
-    //xyz_pub_ = nh_.advertise<shape_registration::point_coordinate>("/realsense_chessboard",10);
-    depth_sub.subscribe(nh_, "/k4a/depth_to_rgb/image_rect", 1);
-    color_sub.subscribe(nh_, "/k4a/rgb/image_rect_color", 1);
-    sync.reset(new Sync(sync_pol(10),depth_sub,color_sub));
-    sync->registerCallback(boost::bind(&Fusion_and_Publish::callback,this,_1,_2));
+    int board_x;
+    int board_y;
+    nh_.getParam("chessboard_calibration/board_x", board_x);
+    nh_.getParam("chessboard_calibration/board_y", board_y);
+    board_size = cv::Size(board_x, board_y);
+    depth_sub.subscribe(nh_, "/depth_to_rgb_image", 1);
+    color_sub.subscribe(nh_, "/rgb_image", 1);
+    cam_info_sub.subscribe(nh_, "/camera_info", 1);
+    sync.reset(new Sync(sync_pol(5),depth_sub, color_sub, cam_info_sub));
+    sync->registerCallback(boost::bind(&Fusion_and_Publish::callback,this,_1,_2,_3));
     cv::namedWindow("Extractcorner",0);
     cv::resizeWindow("Extractcorner", 1080, 1920);
 }
 
-void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image, const sensor_msgs::ImageConstPtr &color_image)
+void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image, const sensor_msgs::ImageConstPtr &color_image,
+                                  const sensor_msgs::CameraInfoConstPtr& cam_info_msg)
 {
+
+    float cx = static_cast<float>(cam_info_msg->K.at(2));
+    float cy = static_cast<float>(cam_info_msg->K.at(5));
+    float fx = static_cast<float>(cam_info_msg->K.at(0));
+    float fy = static_cast<float>(cam_info_msg->K.at(4));
     cv_bridge::CvImageConstPtr cv_ptr_depth;
     cv_bridge::CvImageConstPtr cv_ptr_color;
     try
@@ -77,7 +92,6 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
         cv_ptr_depth = cv_bridge::toCvCopy(depth_image, sensor_msgs::image_encodings::TYPE_32FC1);
         cv::Mat data;
         data = cv_bridge::toCvCopy(depth_image, sensor_msgs::image_encodings::TYPE_32FC1)->image;
-        //std::cout << "Depth of center point: "<<data.at<float>(240, 320) * depth_scale<<std::endl;
     }
     catch (cv_bridge::Exception& e)
     {
@@ -98,45 +112,29 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
     if(!patternfound)
     {
         std::cout << "can not find chessboard corners!" << std::endl;
-        //exit(1);
+        exit(1);
     }
     else
     {
         ROS_INFO_STREAM("FOUND");
         cv::cornerSubPix(imageGray, corners, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 100, 0.001));
-        std::cout << "corners:"<<std::endl;
     }
 
-//    shape_registration::point_coordinate points;
 
-    // 1.2412607295249753 0.09654753630899422 0.5782754163858845 -0.6533612462844834 -0.5924779514600383 0.3022795994822185 0.3615466811134804
+    // 1.1343385552084106 0.18684291597759045 0.5855197817662712 -0.640603326420202 -0.6093896568468945 0.31527794174594137 0.34477738289487503
+
+    // TODO read the transformation from the YAML file in /home/nehil/.ros/easy_handeye/iiwa_azure_kinect_eye_on_base.yaml
 
     geometry_msgs::TransformStamped transformStamped;
-    transformStamped.transform.rotation.x = -0.6533612462844834;
-    transformStamped.transform.rotation.y = -0.5924779514600383;
-    transformStamped.transform.rotation.z = 0.3022795994822185;
-    transformStamped.transform.rotation.w = 0.3615466811134804;
-    transformStamped.transform.translation.x = 1.2412607295249753;
-    transformStamped.transform.translation.y = 0.09654753630899422;
-    transformStamped.transform.translation.z = 0.5782754163858845;
+    transformStamped.transform.rotation.x = -0.640603326420202;
+    transformStamped.transform.rotation.y = -0.6093896568468945;
+    transformStamped.transform.rotation.z = 0.31527794174594137;
+    transformStamped.transform.rotation.w = 0.34477738289487503;
+    transformStamped.transform.translation.x = 1.1343385552084106;
+    transformStamped.transform.translation.y = 0.18684291597759045;
+    transformStamped.transform.translation.z = 0.5855197817662712;
 
     std::cout << transformStamped << std::endl;
-
-
-//    tf2_ros::Buffer tfBuffer;
-//    tf2_ros::TransformListener tfListener(tfBuffer);
-//    try{
-//      transformStamped = tfBuffer.lookupTransform("iiwa_link_0", "/rgb_camera_link", ros::Time(0));
-//      std::cout << transformStamped << std::endl;
-//    }
-//    catch (tf2::TransformException &ex) {
-//      ROS_WARN("%s",ex.what());
-//      ros::Duration(1.0).sleep();
-//    }
-
-    // K: [913.50146484375, 0.0, 960.0751953125, 0.0, 913.4027099609375, 551.0783081054688, 0.0, 0.0, 1.0]
-    // [913.50146484375, 0.0, 960.0751953125, 0.0, 913.4027099609375, 551.0783081054688, 0.0, 0.0, 1.0]
-    // 913.50146484375, 0.0, 960.0751953125, 0.0, 0.0, 913.4027099609375, 551.0783081054688, 0.0, 0.0, 0.0, 1.0, 0.0
 
     for(std::size_t i = 0; i < corners.size(); i++)
     {
@@ -145,11 +143,8 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
 
         geometry_msgs::Point32 tempPoint;
         tempPoint.z = cv_ptr_depth->image.at<float>(static_cast<int>(corners[i].y), static_cast<int>(corners[i].x));
-        // 913.50146484375, 0.0, 960.0751953125, 0.0, 913.4027099609375, 551.0783081054688, 0.0, 0.0, 1.0
-        tempPoint.x = (corners[i].x - 960.0751953125f) * tempPoint.z / 913.50146484375f;
-        tempPoint.y = (corners[i].y - 551.0783081054688f) * tempPoint.z / 913.50146484375f;
-
-        //std::cout << "["<<tempPoint.x <<", "<<tempPoint.y<<", "<<tempPoint.z<<"]"<<std::endl;
+        tempPoint.x = (corners[i].x - cx) * tempPoint.z / fx;
+        tempPoint.y = (corners[i].y - cy) * tempPoint.z / fy;
 
         geometry_msgs::PointStamped  transformed_pt ;
         geometry_msgs::PointStamped  initial_pt;
@@ -157,21 +152,12 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
         initial_pt.point.y = tempPoint.y;
         initial_pt.point.z = tempPoint.z;
 
-        //std::cout << "["<<initial_pt.point.x <<", "<<initial_pt.point.y<<", "<<initial_pt.point.z<<"]"<<std::endl;
-
-        //std::cout << i+1 << ":  ["<<tempPoint.x <<", "<<tempPoint.y<<", "<<tempPoint.z<<"]"<<std::endl;
-
         tf2::doTransform(initial_pt, transformed_pt, transformStamped);
 
          tempPoint.x = transformed_pt.point.x;
          tempPoint.y = transformed_pt.point.y;
          tempPoint.z = transformed_pt.point.z;
 
-//        points.coordinate.push_back(tempPoint);
-//        points.xs.push_back(tempPoint.x);//xs is vector of x coordinates of all corner points, just for rqt_plot, the same as ys and zs.
-//        points.ys.push_back(tempPoint.y);
-//        points.zs.push_back(tempPoint.z);
-         //std::cout << "hey" << std::endl;
          std::cout << i+1 << ":  [" <<transformed_pt.point.x <<", "<<transformed_pt.point.y<<", "<<transformed_pt.point.z<<"]"<<std::endl;
          if(i+1 == 21) {
            //std::cout << i+1 << ":  ["<<tempPoint.x <<", "<<tempPoint.y<<", "<<tempPoint.z<<"]"<<std::endl;
