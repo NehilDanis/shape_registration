@@ -34,6 +34,7 @@
               respawn="true">
             <remap from="image_mono"  to="rgb/image_raw" />
             <remap from="image_rect"  to="rgb/image_rect_color" />
+            <param name="interpolation" value="0" />
         </node>
 
         <!-- Spawn an image_proc/rectify nodelet to rectify the depth to RGB image -->
@@ -43,6 +44,7 @@
               respawn="true">
           <remap from="image_mono"  to="depth_to_rgb/image_raw" />
           <remap from="image_rect"  to="depth_to_rgb/image_rect" />
+          <param name="interpolation" value="0" />
         </node>
 
         <!-- Spawn an image_proc/rectify nodelet to rectify the depth image -->
@@ -52,7 +54,6 @@
               respawn="true">
             <remap from="image_mono"  to="depth/image_raw" />
             <remap from="image_rect"  to="depth/image_rect" />
-
             <param name="interpolation" value="0" />
         </node>
 
@@ -63,6 +64,7 @@
               respawn="true">
             <remap from="image_mono"  to="ir/image_raw" />
             <remap from="image_rect"  to="ir/image_rect" />
+            <param name="interpolation" value="0" />
         </node>
 
         <group if="$(arg point_cloud)">
