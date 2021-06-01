@@ -14,6 +14,18 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 #include <string>
 #include <vector>
 
+
+/**
+  ROS RELATED
+ **/
+#include <ros/ros.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PointStamped.h>
+//#include <iiwa_msgs/JointPosition.h>
+#include <iiwa_msgs/JointPosition.h>
+#include <sensor_msgs/PointCloud2.h>
+
+
 /**
   PCL RELATED
  **/
@@ -26,6 +38,7 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/features/normal_3d.h>
+#include <pcl_conversions/pcl_conversions.h>
 
 /**
   EIGEN RELATED
@@ -36,8 +49,39 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 using namespace std;
 typedef pcl::PointXYZ PointType;
 
+const std::string BASE_LINK = "iiwa_link_0";
+const std::string EE_LINK = "iiwa_link_ee";
+
+
+Eigen::Quaternionf get_rotation(Eigen::Vector3f y, Eigen::Vector3f z){
+//  y[0] = 0;
+  y[2] = 0;
+//  z[0] = 0;
+//  z[1] = 0;
+  y = y.normalized();
+  z = z.normalized();
+  Eigen::Vector3f x = (y.cross(z)).normalized();
+
+
+  //Eigen::Vector3f x = y.cross(z);
+  Eigen::Matrix3f pose_rotm;
+  std::cout << "rotation matrix" << std::endl;
+  pose_rotm << x, y, z;
+  std::cout << pose_rotm << std::endl;
+  std::cout << "-------------" << std::endl;
+
+  Eigen::Quaternionf q(pose_rotm);
+  return q;
+}
+
 int main(int argc, char **argv)
 {
+
+  ros::init(argc, argv, "robot_controller");
+  ros::NodeHandle nh;
+
+  ros::Publisher pub_desiredPose_;
+  pub_desiredPose_ = nh.advertise<geometry_msgs::PoseStamped>("/iiwa/command/CartesianPose",10);
 
   /**
     READ THE POINTS FROM THE TEXT FILE
@@ -263,9 +307,12 @@ int main(int argc, char **argv)
       std::cout << "ERROR" << std::endl;
     }
     auto trajectory = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
-    for(auto &point : *arm_cloud) {
+    /*for(auto &point : *arm_cloud) {
       std::cout << point << std::endl;
-    }
+    }*/
+    int ind = 0;
+    Eigen::Vector3f prev_point = Eigen::Vector3f::Zero();
+    std::vector<geometry_msgs::PoseStamped> poses;
     for(const auto &searchPoint : *result_cloud) {
       int K = 5;
       std::vector<int> pointIdxKNNSearch(K);
@@ -281,23 +328,50 @@ int main(int argc, char **argv)
 
       if ( num_neighbors > 0 )
       {
-        pcl::PointXYZ result_point;
-        result_point.x = 0;
-        result_point.y = 0;
-        result_point.z = 0;
+        Eigen::Vector3f result_point = Eigen::Vector3f::Zero();
+        Eigen::Vector3f normal_dir = Eigen::Vector3f::Zero();
+        pcl::PointXYZ p_result;
+
         for (std::size_t i = 0; i < pointIdxKNNSearch.size (); ++i) {
           std::cout << (*arm_cloud)[ pointIdxKNNSearch[i] ] << std::endl;
-          result_point.x += (*arm_cloud)[ pointIdxKNNSearch[i] ].x;
-          result_point.y += (*arm_cloud)[ pointIdxKNNSearch[i] ].y;
-          result_point.z += (*arm_cloud)[ pointIdxKNNSearch[i] ].z;
-
+          result_point += (*arm_cloud)[ pointIdxKNNSearch[i] ].getVector3fMap();
+          normal_dir += (*cloud_normals)[ pointIdxKNNSearch[i] ].getNormalVector3fMap();
         }
-        result_point.x  = result_point.x / pointIdxKNNSearch.size ();
-        result_point.y  = result_point.y / pointIdxKNNSearch.size ();
-        result_point.z  = result_point.z / pointIdxKNNSearch.size ();
-        myfile << result_point.x << " " << result_point.y << " " << result_point.z << "\n";
-        trajectory->points.push_back(result_point);
+        result_point /= pointIdxKNNSearch.size ();
+        normal_dir /= pointIdxKNNSearch.size ();
+        //normal_dir *= -1;
+
+        //myfile << result_point.x << " " << result_point.y << " " << result_point.z << "\n";
+        p_result.x = result_point(0);
+        p_result.y = result_point(1);
+        p_result.z = result_point(2);
+
+        if(ind != 0 ) {
+           Eigen::Vector3f direction = result_point - prev_point;
+           Eigen::Quaternionf q = get_rotation(direction, normal_dir);
+           std::cout << p_result.x << " " << p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+           myfile << p_result.x << " " << p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+           geometry_msgs::PoseStamped command;
+           command.header.frame_id = BASE_LINK;
+           command.header.stamp = ros::Time::now();
+           command.header.seq = ind;
+           command.pose.position.x = p_result.x;
+           command.pose.position.y = p_result.y;
+           command.pose.position.z = p_result.z;
+           command.pose.orientation.x = q.x();
+           command.pose.orientation.y = q.y();
+           command.pose.orientation.z = q.z();
+           command.pose.orientation.w = q.w();
+           poses.push_back(command);
+           //pub_desiredPose_.publish(command);
+        }
+        else {
+          prev_point = result_point;
+        }
+
+        trajectory->points.push_back(p_result);
       }
+      ind += 1;
 
     }
 
@@ -307,7 +381,7 @@ int main(int argc, char **argv)
     /**
       VISUALIZATION
     **/
-      pcl::visualization::PCLVisualizer viewer;
+      //pcl::visualization::PCLVisualizer viewer;
 
       //pcl::visualization::PointCloudColorHandlerCustom<PointType> tc_handler(cloud, 0, 255, 0); //Point cloud related to the origin
       //viewer.addPointCloud(cloud, tc_handler, "transformCloud");
@@ -317,26 +391,44 @@ int main(int argc, char **argv)
       //viewer.addArrow(pcaZ, op, 0.0, 0.0, 1.0, false, "arrow_Z");
 
       //cpca.reconstruct(*result_cloud, *result_cloud);
-      pcl::visualization::PointCloudColorHandlerCustom<PointType> color_handler(result_cloud, 255, 0, 0); //The initial point cloud input is related
-      viewer.addPointCloud(result_cloud, color_handler, "cloud");
+//      pcl::visualization::PointCloudColorHandlerCustom<PointType> color_handler(result_cloud, 255, 0, 0); //The initial point cloud input is related
+//      viewer.addPointCloud(result_cloud, color_handler, "cloud");
 
-      pcl::visualization::PointCloudColorHandlerCustom<PointType> trajectory_handler(trajectory, 0, 0, 0); //The initial point cloud input is related
-      viewer.addPointCloud(trajectory, trajectory_handler, "trajectory_cloud");
+//      pcl::visualization::PointCloudColorHandlerCustom<PointType> trajectory_handler(trajectory, 0, 0, 0); //The initial point cloud input is related
+//      viewer.addPointCloud(trajectory, trajectory_handler, "trajectory_cloud");
 
-      pcl::visualization::PointCloudColorHandlerCustom<PointType> arm_handler(arm_cloud, 0, 255, 255); //The initial point cloud input is related
-      viewer.addPointCloud(arm_cloud, arm_handler, "arm_acloud");
+//      pcl::visualization::PointCloudColorHandlerCustom<PointType> arm_handler(arm_cloud, 0, 255, 255); //The initial point cloud input is related
+//      viewer.addPointCloud(arm_cloud, arm_handler, "arm_acloud");
 
-      viewer.addArrow(pcX, cp, 1.0, 0.0, 0.0, false, "arrow_x");
-      viewer.addArrow(pcY, cp, 0.0, 1.0, 0.0, false, "arrow_y");
-      viewer.addArrow(pcZ, cp, 0.0, 0.0, 1.0, false, "arrow_z");
+//      viewer.addArrow(pcX, cp, 1.0, 0.0, 0.0, false, "arrow_x");
+//      viewer.addArrow(pcY, cp, 0.0, 1.0, 0.0, false, "arrow_y");
+//      viewer.addArrow(pcZ, cp, 0.0, 0.0, 1.0, false, "arrow_z");
 
 
-      //viewer.addCoordinateSystem(0.5f*sc1);
-      viewer.setBackgroundColor(1.0, 1.0, 1.0);
-      while (!viewer.wasStopped())
-      {
-        viewer.spinOnce(100);
+//      //viewer.addCoordinateSystem(0.5f*sc1);
+//      viewer.setBackgroundColor(1.0, 1.0, 1.0);
+//      while (!viewer.wasStopped())
+//      {
+//        viewer.spinOnce(100);
+//      }#
+
+
+    ros::Publisher m_pub_source = nh.advertise<sensor_msgs::PointCloud2>("/arm_downsampled", 30);
+    sensor_msgs::PointCloud2 msg_source;
+    pcl::toROSMsg(*arm_cloud, msg_source);
+    msg_source.header.frame_id = "iiwa_link_0";
+
+    ros::Rate loop_rate(1);
+    while(ros::ok()) {
+      for(auto command : poses) {
+        loop_rate.sleep();
+        pub_desiredPose_.publish(command);
+        m_pub_source.publish(msg_source);
+        //m_pub_source.publish(msg_source);
+        ROS_INFO("NEW POSE");
       }
+      ros::spinOnce();
+    }
 
     return 0;
 }
