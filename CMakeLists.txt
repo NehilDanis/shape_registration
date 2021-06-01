@@ -19,6 +19,8 @@ find_package(Yaml-cpp 0.6.0 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  iiwa_ros
+  iiwa_msgs
   sensor_msgs
   std_msgs
   image_transport
@@ -69,6 +71,10 @@ add_executable(arm_tracking_node src/arm_tracking.cpp algorithms/icp_algorithm.c
 
 add_executable(pca_thing utils/find_pca_of_artery.cpp)
 
+add_executable(robot_controller utils/control_the_robot.cpp)
+
+add_executable(check_icp utils/size_change_effect_icp.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
+
 target_link_libraries(calibration_checker_node
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
@@ -112,5 +118,15 @@ target_link_libraries(pca_thing
    ${PCL_LIBRARIES}
  )
 
+target_link_libraries(robot_controller
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
 
+target_link_libraries(check_icp
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
 
