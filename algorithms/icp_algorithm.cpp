@@ -14,7 +14,7 @@ ICPAlgorithm::ICPAlgorithm(int max_num_iter)
 void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
   // Before applying icp, it is better to find an initial alignment, between the clouds.
 
-  double start_calc_normals =ros::Time::now().toSec();
+//  double start_calc_normals =ros::Time::now().toSec();
   /**
     Calculate the normals for source
     */
@@ -27,15 +27,15 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
    PointCloudNormal::Ptr target_normals;
    calculateNormals(target, target_normals);
 
-   double finish_calc_normals =ros::Time::now().toSec();
-   ROS_INFO("Time takes for calculating normals of the target and source clouds: %f", finish_calc_normals - start_calc_normals);
+//   double finish_calc_normals =ros::Time::now().toSec();
+//   ROS_INFO("Time takes for calculating normals of the target and source clouds: %f", finish_calc_normals - start_calc_normals);
 
   /**
     Now we want to find the persistent keypoints from both source and target clouds in different scales.
     Then we can use these keypoints and their features while finding the initial alignment.
     */
 
-   double start_calc_persistent_feat =ros::Time::now().toSec();
+//   double start_calc_persistent_feat =ros::Time::now().toSec();
    /**
      FIND PERSISTENT FEATURES FOR THE SOURCE CLOUD
      */
@@ -58,9 +58,9 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
    PointCloudT::Ptr target_non_keypoints(new PointCloudT);
    Preprocessing::extract_indices(target, target_keypoints_indices, target_keypoints, target_non_keypoints);
 
-   double finish_calc_persistent_feat =ros::Time::now().toSec();
+//   double finish_calc_persistent_feat =ros::Time::now().toSec();
 
-   ROS_INFO("Time takes for calculating persistent features: %f", finish_calc_persistent_feat - start_calc_persistent_feat);
+//   ROS_INFO("Time takes for calculating persistent features: %f", finish_calc_persistent_feat - start_calc_persistent_feat);
    ROS_INFO("The number of persistent features found in source: %zu", source_keypoints->size());
    ROS_INFO("The number of persistent features found in target: %zu", target_keypoints->size());
 
@@ -69,7 +69,7 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
     drop the ones which are not likely.
     */
 
-   double start_calc_correspondences =ros::Time::now().toSec();
+//   double start_calc_correspondences =ros::Time::now().toSec();
 
    pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
    pcl::registration::CorrespondenceEstimation<Feature, Feature> cest;
@@ -91,9 +91,9 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
    // The below line somehow didnt work!
    //estimate_correspondances(source_features, target_features, source_keypoints, target_keypoints, corr_filtered);
 
-   double finish_calc_correspondences =ros::Time::now().toSec();
+//   double finish_calc_correspondences =ros::Time::now().toSec();
 
-   ROS_INFO("Time takes for calculating the feature correspondences: %f", finish_calc_correspondences - start_calc_correspondences);
+//   ROS_INFO("Time takes for calculating the feature correspondences: %f", finish_calc_correspondences - start_calc_correspondences);
    /**
     Find the initial alignment between source and the target
     */

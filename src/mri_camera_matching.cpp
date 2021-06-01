@@ -28,17 +28,20 @@ MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
 //  std::cout << typeid(config).name() << std::endl;
 //  std::cout << typeid(config[0]).name() << std::endl;
 //  std::cout << config[0] << std::endl;
-  transformStamped.transform.rotation.x = -0.6533612462844834;
-  transformStamped.transform.rotation.y = -0.5924779514600383;
-  transformStamped.transform.rotation.z = 0.3022795994822185;
-  transformStamped.transform.rotation.w = 0.3615466811134804;
-  transformStamped.transform.translation.x = 1.2412607295249753;
-  transformStamped.transform.translation.y = 0.09654753630899422;
-  transformStamped.transform.translation.z = 0.5782754163858845;
 
-  transformation_to_robot_base << 0.1151938,  0.5556279, -0.8234124, 1.2412607295249753,
-      0.9927806, -0.0365077,  0.1142532, 0.09654753630899422,
-      0.0334213, -0.8306292, -0.5558221, 0.5782754163858845,
+  // 1.1343385552084106 0.18684291597759045 0.5855197817662712 -0.640603326420202 -0.6093896568468945 0.31527794174594137 0.34477738289487503
+  transformStamped.transform.rotation.x = -0.640603326420202;
+  transformStamped.transform.rotation.y = -0.6093896568468945;
+  transformStamped.transform.rotation.z = 0.31527794174594137;
+  transformStamped.transform.rotation.w = 0.34477738289487503;
+  transformStamped.transform.translation.x = 1.1343385552084106;
+  transformStamped.transform.translation.y = 0.18684291597759045;
+  transformStamped.transform.translation.z = 0.5855197817662712;
+
+
+  transformation_to_robot_base << 0.0584881,  0.5633527, -0.8241438, 1.1343385552084106,
+  0.9981555, -0.0195456,  0.0574768, 0.18684291597759045,
+  0.0162713, -0.8259853, -0.5634568, 0.5855197817662712,
       0, 0, 0, 1;
 
 
@@ -84,6 +87,11 @@ MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
   this->m_artery_cloud = *cloud_artery;
 
   this->m_source_cloud = *cloud;
+
+  //pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/arm_downsampled.pcd", *cloud);
+  //pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_downsampled.pcd", *cloud_artery);
+
+
 
   this->m_pub = nh->advertise<sensor_msgs::PointCloud2>("/final_result", 30);
   this->m_pub_transformed_source = nh->advertise<sensor_msgs::PointCloud2>("/transformed_source", 30);
@@ -243,11 +251,6 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
        std::cout << point << std::endl;
      }
 
-
-     // Transform the artery to the robot base coordinates
-
-     pcl::transformPointCloud(*artery, *artery, this->transformation_to_robot_base);
-
      /*sensor_msgs::PointCloud2 msg_artery_robot_base;
      pcl::toROSMsg(*artery, msg_artery_robot_base);
      msg_artery_robot_base.fields = ros_cloud->fields;
@@ -255,22 +258,25 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
      this->m_pub_artery_robot_base.publish(msg_artery);*/
 
      if(saved_artery_file == 0) {
+       // Transform the artery to the robot base coordinates
+
+       std::cout << "savinnnnggg" << std::endl;
+
+       auto artery_in_robot_base = std::make_shared<PointCloudT>();
+       pcl::transformPointCloud(*artery, *artery_in_robot_base, this->transformation_to_robot_base);
+
+       // transform the arm to the robot base and sace the point cloud
+
+       auto arm_in_robot_base = std::make_shared<PointCloudT>();
+       pcl::transformPointCloud(*target, *arm_in_robot_base, this->transformation_to_robot_base);
+
        // Save the points to pcd file.
-       std::cout << "heyy artery file is saved" << std::endl;
-       /*pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.pcd", *artery);
-       pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base_downsampled.pcd", *(Preprocessing::voxel_grid_downsampling(artery, 0.01f)));*/
-
-
-       // find the eigen vectors
-
-       pcl::PCA<PointT> cpca = new pcl::PCA<PointT>;
-       cpca.setInputCloud(artery);
-
-       std::cout << cpca.getEigenVectors() << std::endl;
+       pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/arm_downsampled.pcd", *arm_in_robot_base);
+       pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_downsampled.pcd", *artery_in_robot_base);
 
        // create a txt file
 
-       ofstream myfile ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.txt");
+       /*ofstream myfile ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.txt");
          if (myfile.is_open())
          {
            for(const auto &point : *artery) {
@@ -278,7 +284,7 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
            }
            myfile.close();
          }
-         else cout << "Unable to open file";
+         else cout << "Unable to open file";*/
 
 
        saved_artery_file += 1;
