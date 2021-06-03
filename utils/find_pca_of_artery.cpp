@@ -13,6 +13,7 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 
 /**
@@ -24,6 +25,7 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 //#include <iiwa_msgs/JointPosition.h>
 #include <iiwa_msgs/JointPosition.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <visualization_msgs/MarkerArray.h>
 
 
 /**
@@ -39,6 +41,7 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include "shape_registration/utils/preprocessing.hpp"
 
 /**
   EIGEN RELATED
@@ -49,29 +52,47 @@ VTK_MODULE_INIT(vtkRenderingFreeType);
 using namespace std;
 typedef pcl::PointXYZ PointType;
 
+
 const std::string BASE_LINK = "iiwa_link_0";
 const std::string EE_LINK = "iiwa_link_ee";
 
 
-Eigen::Quaternionf get_rotation(Eigen::Vector3f y, Eigen::Vector3f z){
-//  y[0] = 0;
-  y[2] = 0;
-//  z[0] = 0;
-//  z[1] = 0;
-  y = y.normalized();
+Eigen::Quaternionf get_rotation(Eigen::Vector3f x, Eigen::Vector3f z){
+  //z[0] = - std::abs(z[0]);
+  //z[1] = - std::abs(z[1]);
+  z[2] = - std::abs(z[2]);
+
+
+//  std::cout << "before normalization y: " << y << std::endl;
+//  std::cout << "before normalization z: " << z << std::endl;
+//  std::cout << "norm of z: " << z.norm() << std::endl;
+//  std::cout << "the dot product:" << y.dot(z) << std::endl;
+
+  x = x.normalized();
   z = z.normalized();
-  Eigen::Vector3f x = (y.cross(z)).normalized();
+  std::cout << "x: " << x << std::endl;
+  std::cout << "z: " << z << std::endl;
+
+  Eigen::Vector3f y = (z.cross(x)).normalized();
+
+  std::cout << "x: " << x << std::endl;
 
 
-  //Eigen::Vector3f x = y.cross(z);
   Eigen::Matrix3f pose_rotm;
   std::cout << "rotation matrix" << std::endl;
+  //pose_rotm << 1, 0, 0, 0, -1, 0, 0, 0, -1;
   pose_rotm << x, y, z;
   std::cout << pose_rotm << std::endl;
   std::cout << "-------------" << std::endl;
 
+
   Eigen::Quaternionf q(pose_rotm);
-  return q;
+
+  return q.normalized();
+}
+
+void find_trajectory_from_p_cloud(Po){
+
 }
 
 int main(int argc, char **argv)
@@ -82,6 +103,8 @@ int main(int argc, char **argv)
 
   ros::Publisher pub_desiredPose_;
   pub_desiredPose_ = nh.advertise<geometry_msgs::PoseStamped>("/iiwa/command/CartesianPose",10);
+
+  //ros::Publisher vis_pub = nh.advertise<visualization_msgs::Marker>( "/visualization_marker", 0 );
 
   /**
     READ THE POINTS FROM THE TEXT FILE
@@ -100,6 +123,19 @@ int main(int argc, char **argv)
   {
     PCL_ERROR ("Couldn't read file\n");
   }
+
+//  for (auto &point : arm_cloud->points) {
+//    point.x = point.x / 1000;
+//    point.y = point.y / 1000;
+//    point.z = point.z / 1000;
+//  }
+
+//  for (auto &point : cloud->points) {
+//    point.x = point.x / 1000;
+//    point.y = point.y / 1000;
+//    point.z = point.z / 1000;
+//  }
+
 
   /*std::string s;
   std::ifstream myfile ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.txt");
@@ -230,7 +266,7 @@ int main(int argc, char **argv)
   std::cout << max_p << std::endl;
   std::cout << "------------" << std::endl;
 
-  for(float start = min_p.x; start < max_p.x; start += 0.01) {
+  for(float start = min_p.x; start < max_p.x; start += 0.02) {
     // every 2mm do knn
 
     pcl::PointXYZ searchPoint;
@@ -300,6 +336,11 @@ int main(int argc, char **argv)
 
 
 
+    pcl::PointXYZ minPt, maxPt;
+    pcl::getMinMax3D (*arm_cloud, minPt, maxPt);
+    float max_z  = maxPt.z;
+    float min_z = minPt.z;
+
     pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_n;
     kdtree_n.setInputCloud(arm_cloud);
     ofstream myfile ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.txt");
@@ -313,8 +354,9 @@ int main(int argc, char **argv)
     int ind = 0;
     Eigen::Vector3f prev_point = Eigen::Vector3f::Zero();
     std::vector<geometry_msgs::PoseStamped> poses;
-    for(const auto &searchPoint : *result_cloud) {
+    for(auto &searchPoint : *result_cloud) {
       int K = 5;
+      searchPoint.z = max_z;
       std::vector<int> pointIdxKNNSearch(K);
       std::vector<float> pointKNNSquaredDistance(K);
 
@@ -331,26 +373,30 @@ int main(int argc, char **argv)
         Eigen::Vector3f result_point = Eigen::Vector3f::Zero();
         Eigen::Vector3f normal_dir = Eigen::Vector3f::Zero();
         pcl::PointXYZ p_result;
-
+        float z_value = min_z;
         for (std::size_t i = 0; i < pointIdxKNNSearch.size (); ++i) {
-          std::cout << (*arm_cloud)[ pointIdxKNNSearch[i] ] << std::endl;
-          result_point += (*arm_cloud)[ pointIdxKNNSearch[i] ].getVector3fMap();
-          normal_dir += (*cloud_normals)[ pointIdxKNNSearch[i] ].getNormalVector3fMap();
+          if((*arm_cloud)[ pointIdxKNNSearch[i] ].z > z_value) {
+            z_value = (*arm_cloud)[ pointIdxKNNSearch[i] ].z;
+            result_point = (*arm_cloud)[ pointIdxKNNSearch[i] ].getVector3fMap();
+            normal_dir = (*cloud_normals)[ pointIdxKNNSearch[i] ].getNormalVector3fMap();
+          }
         }
-        result_point /= pointIdxKNNSearch.size ();
-        normal_dir /= pointIdxKNNSearch.size ();
-        //normal_dir *= -1;
 
-        //myfile << result_point.x << " " << result_point.y << " " << result_point.z << "\n";
         p_result.x = result_point(0);
         p_result.y = result_point(1);
         p_result.z = result_point(2);
 
         if(ind != 0 ) {
+
            Eigen::Vector3f direction = result_point - prev_point;
+           std::cout << "Direction" << std::endl;
+           std::cout << direction << std::endl;
+           if(direction[1] > 0) {
+             std::cout << "GOING WRONG DIRECTION" <<std::endl;
+           }
            Eigen::Quaternionf q = get_rotation(direction, normal_dir);
            std::cout << p_result.x << " " << p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
-           myfile << p_result.x << " " << p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+           myfile << p_result.x << " " <<p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
            geometry_msgs::PoseStamped command;
            command.header.frame_id = BASE_LINK;
            command.header.stamp = ros::Time::now();
@@ -364,53 +410,131 @@ int main(int argc, char **argv)
            command.pose.orientation.w = q.w();
            poses.push_back(command);
            //pub_desiredPose_.publish(command);
+           trajectory->points.push_back(p_result);
         }
         else {
           prev_point = result_point;
         }
-
-        trajectory->points.push_back(p_result);
       }
       ind += 1;
-
     }
 
     myfile.close();
 
 
+    std::cout << "Trajectory size : " << trajectory->points.size();
+
+//    pcl::KdTreeFLANN<pcl::PointXYZ> kdtree_n;
+//    kdtree_n.setInputCloud(arm_cloud);
+//    ofstream myfile ("/home/nehil/catkin_ws_registration/src/artery_in_robot_base.txt");
+//    if (!myfile.is_open()) {
+//      std::cout << "ERROR" << std::endl;
+//    }
+//    auto trajectory = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+//    /*for(auto &point : *arm_cloud) {
+//      std::cout << point << std::endl;
+//    }*/
+//    int ind = 0;
+//    Eigen::Vector3f prev_point = Eigen::Vector3f::Zero();
+//    std::vector<geometry_msgs::PoseStamped> poses;
+//    for(const auto &searchPoint : *result_cloud) {
+//      int K = 5;
+//      std::vector<int> pointIdxKNNSearch(K);
+//      std::vector<float> pointKNNSquaredDistance(K);
+
+//      std::cout << "K nearest neighbor search at (" << searchPoint.x
+//                << " " << searchPoint.y
+//                << " " << searchPoint.z
+//                << ") with K=" << K << std::endl;
+
+//      size_t num_neighbors = kdtree_n.nearestKSearch (searchPoint, K, pointIdxKNNSearch, pointKNNSquaredDistance);
+//      std::cout << num_neighbors << std::endl;
+
+//      if ( num_neighbors > 0 )
+//      {
+//        Eigen::Vector3f result_point = Eigen::Vector3f::Zero();
+//        Eigen::Vector3f normal_dir = Eigen::Vector3f::Zero();
+//        pcl::PointXYZ p_result;
+
+//        for (std::size_t i = 0; i < pointIdxKNNSearch.size (); ++i) {
+//          std::cout << (*arm_cloud)[ pointIdxKNNSearch[i] ] << std::endl;
+//          result_point += (*arm_cloud)[ pointIdxKNNSearch[i] ].getVector3fMap();
+//          normal_dir += (*cloud_normals)[ pointIdxKNNSearch[i] ].getNormalVector3fMap();
+//        }
+//        result_point /= pointIdxKNNSearch.size ();
+//        normal_dir /= pointIdxKNNSearch.size ();
+//        //normal_dir[2] *= -1;
+
+//        //myfile << result_point.x << " " << result_point.y << " " << result_point.z << "\n";
+//        p_result.x = result_point(0);
+//        p_result.y = result_point(1);
+//        p_result.z = result_point(2);
+
+//        if(ind != 0 ) {
+//           Eigen::Vector3f direction = result_point - prev_point;
+//           Eigen::Quaternionf q = get_rotation(direction, normal_dir);
+//           std::cout << p_result.x << " " << p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+//           myfile << p_result.x << " " <<p_result.y << " " << p_result.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
+//           geometry_msgs::PoseStamped command;
+//           command.header.frame_id = BASE_LINK;
+//           command.header.stamp = ros::Time::now();
+//           command.header.seq = ind;
+//           command.pose.position.x = p_result.x;
+//           command.pose.position.y = p_result.y;
+//           command.pose.position.z = p_result.z;
+//           command.pose.orientation.x = q.x();
+//           command.pose.orientation.y = q.y();
+//           command.pose.orientation.z = q.z();
+//           command.pose.orientation.w = q.w();
+//           poses.push_back(command);
+//           //pub_desiredPose_.publish(command);
+//        }
+//        else {
+//          prev_point = result_point;
+//        }
+
+//        trajectory->points.push_back(p_result);
+//      }
+//      ind += 1;
+
+//    }
+
+//    myfile.close();
+
+
     /**
       VISUALIZATION
     **/
-      //pcl::visualization::PCLVisualizer viewer;
+      pcl::visualization::PCLVisualizer viewer;
 
-      //pcl::visualization::PointCloudColorHandlerCustom<PointType> tc_handler(cloud, 0, 255, 0); //Point cloud related to the origin
-      //viewer.addPointCloud(cloud, tc_handler, "transformCloud");
+//      pcl::visualization::PointCloudColorHandlerCustom<PointType> tc_handler(cloud, 0, 255, 0); //Point cloud related to the origin
+//      viewer.addPointCloud(cloud, tc_handler, "transformCloud");
 
       //viewer.addArrow(pcaX, op, 1.0, 0.0, 0.0, false, "arrow_X");
       //viewer.addArrow(pcaY, op, 0.0, 1.0, 0.0, false, "arrow_Y");
       //viewer.addArrow(pcaZ, op, 0.0, 0.0, 1.0, false, "arrow_Z");
 
       //cpca.reconstruct(*result_cloud, *result_cloud);
-//      pcl::visualization::PointCloudColorHandlerCustom<PointType> color_handler(result_cloud, 255, 0, 0); //The initial point cloud input is related
-//      viewer.addPointCloud(result_cloud, color_handler, "cloud");
+      pcl::visualization::PointCloudColorHandlerCustom<PointType> color_handler(result_cloud, 255, 0, 0); //The initial point cloud input is related
+      viewer.addPointCloud(result_cloud, color_handler, "cloud");
 
-//      pcl::visualization::PointCloudColorHandlerCustom<PointType> trajectory_handler(trajectory, 0, 0, 0); //The initial point cloud input is related
-//      viewer.addPointCloud(trajectory, trajectory_handler, "trajectory_cloud");
+      pcl::visualization::PointCloudColorHandlerCustom<PointType> trajectory_handler(trajectory, 0, 0, 0); //The initial point cloud input is related
+      viewer.addPointCloud(trajectory, trajectory_handler, "trajectory_cloud");
 
-//      pcl::visualization::PointCloudColorHandlerCustom<PointType> arm_handler(arm_cloud, 0, 255, 255); //The initial point cloud input is related
-//      viewer.addPointCloud(arm_cloud, arm_handler, "arm_acloud");
+      pcl::visualization::PointCloudColorHandlerCustom<PointType> arm_handler(arm_cloud, 0, 255, 255); //The initial point cloud input is related
+      viewer.addPointCloud(arm_cloud, arm_handler, "arm_acloud");
 
 //      viewer.addArrow(pcX, cp, 1.0, 0.0, 0.0, false, "arrow_x");
 //      viewer.addArrow(pcY, cp, 0.0, 1.0, 0.0, false, "arrow_y");
 //      viewer.addArrow(pcZ, cp, 0.0, 0.0, 1.0, false, "arrow_z");
 
 
-//      //viewer.addCoordinateSystem(0.5f*sc1);
-//      viewer.setBackgroundColor(1.0, 1.0, 1.0);
-//      while (!viewer.wasStopped())
-//      {
-//        viewer.spinOnce(100);
-//      }#
+      //viewer.addCoordinateSystem(0.5f*sc1);
+      viewer.setBackgroundColor(1.0, 1.0, 1.0);
+      while (!viewer.wasStopped())
+      {
+        viewer.spinOnce(100);
+      }
 
 
     ros::Publisher m_pub_source = nh.advertise<sensor_msgs::PointCloud2>("/arm_downsampled", 30);
