@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+# license removed for brevity
+import rospy
+import sys
+from sensor_msgs.msg import Image
+import Pyro4
+
+@Pyro4.expose
+@Pyro4.behavior(instance_mode="single")
+class PublisherPyro(object):
+    def __init__(self):
+        self.called = False
+        self.sub = rospy.Subscriber("/k4a/rgb/image_rect_color", Image, self.callback)
+        #self.pub = rospy.Publisher("/mask", Image, 10)
+
+    def callback(self, imageData):
+        # here we get the rectified rgb image from the azure kinect
+        # we need to send this image inside the docker so that it will be used in the deep learning
+        # pipeline
+        if(self.called):
+            print("heyyyy")
+            print(imageData)
+    def connection_point(self):
+        print("self.called is set to true")
+        self.called = True
+def main(args):
+    Pyro4.Daemon.serveSimple(
+    {
+        PublisherPyro: "ros_side.publisherpyro"
+    },
+    ns = True)
+#  pp = PublisherPyro()
+    rospy.init_node('Pyro_Publisher_Node', anonymous=True)
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        print("Shutting down")
+
+if __name__ == '__main__':
+    main(sys.argv)
+

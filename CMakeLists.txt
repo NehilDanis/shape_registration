@@ -10,8 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 find_package(PCL 1.11.1 REQUIRED)
 find_package(Yaml-cpp 0.6.0 REQUIRED)
 #find_package(OpenCV 4.5.2 REQUIRED core imgproc calib3d video features2d highgui)
-#message("??? ${OpenCV_LIBS}")
-#message("??? END")
+message("??? ${OpenCV_LIBS}")
+message("??? END")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
   iiwa_ros
   iiwa_msgs
   sensor_msgs
+  visualization_msgs
   std_msgs
   image_transport
   cv_bridge
@@ -30,6 +31,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros)
 
 find_package(OpenCV 3 REQUIRED)
+message("??? ${OpenCV_LIBS}")
+message("??? END")
 
 catkin_package(
 #  INCLUDE_DIRS include
@@ -39,6 +42,7 @@ catkin_package(
   rospy
   std_msgs
   sensor_msgs
+  visualization_msgs
   image_transport
   cv_bridge
   geometry_msgs
@@ -54,12 +58,17 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
 )
 
+catkin_install_python(PROGRAMS scripts/publisher_pyro.py scripts/image_saver.py scripts/movement_detector.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
 
 #set(OpenCV_LIBS opencv_core opencv_imgproc opencv_calib3d opencv_video opencv_features2d opencv_highgui)
 
 add_executable(calibration_checker_node utils/calibration_checker_node.cpp)
 
 add_executable(ROI_cropping_node utils/crop_roi.cpp)
+
+add_executable(test_depth_projection_node utils/test_depth_projection.cpp)
 
 add_executable(preprocessing_node utils/kinect_subscriber.cpp utils/preprocessing.cpp)
 
@@ -75,13 +84,47 @@ add_executable(robot_controller utils/control_the_robot.cpp)
 
 add_executable(check_icp utils/size_change_effect_icp.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
 
-target_link_libraries(calibration_checker_node
+add_executable(test_icp utils/test_icp.cpp utils/preprocessing.cpp)
+
+add_executable(transformation_checker_node utils/check_transformation.cpp)
+
+add_executable(test_depth_vals_node utils/test_depth_vals.cpp)
+
+
+target_link_libraries(test_depth_vals_node
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
  )
 
+
+target_include_directories(calibration_checker_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
+
+target_link_libraries(calibration_checker_node
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
+ )
+
+target_include_directories(transformation_checker_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
+
+target_link_libraries(transformation_checker_node
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
+ )
+
 target_link_libraries(ROI_cropping_node
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
+
+target_link_libraries(test_depth_projection_node
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
@@ -93,11 +136,17 @@ target_link_libraries(preprocessing_node
    ${PCL_LIBRARIES}
  )
 
+target_include_directories(plane_segmentation_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
 target_link_libraries(plane_segmentation_node
    ${OpenCV_LIBS}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
  )
+
+target_include_directories(registration_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
 
 target_link_libraries(registration_node
    ${OpenCV_LIBS}
@@ -106,10 +155,13 @@ target_link_libraries(registration_node
    ${YAML_CPP_LIBRARIES}
  )
 
+target_include_directories(arm_tracking_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
 target_link_libraries(arm_tracking_node
    ${OpenCV_LIBS}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
  )
 
 target_link_libraries(pca_thing
@@ -125,6 +177,12 @@ target_link_libraries(robot_controller
  )
 
 target_link_libraries(check_icp
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
+
+target_link_libraries(test_icp
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
