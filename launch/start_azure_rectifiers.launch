@@ -14,7 +14,7 @@
             <arg name="overwrite_robot_description" value="false" />
             <arg name="color_enabled" value="true"/>
             <arg name="depth_enabled"     value="true" />
-            <arg name="depth_mode"        value="NFOV_UNBINNED" />
+            <!--<arg name="depth_mode"        value="NFOV_UNBINNED" />--> <!--DON'T USE THIS, BREAKS THE CROP ROI PIPELINE-->
             <arg name="color_resolution" value="1080P"/>
             <arg name="point_cloud" value="true"/>
             <arg name="rgb_point_cloud" value="true"/>
@@ -34,7 +34,7 @@
               respawn="true">
             <remap from="image_mono"  to="rgb/image_raw" />
             <remap from="image_rect"  to="rgb/image_rect_color" />
-            <param name="interpolation" value="0" />
+            <!--<param name="interpolation" value="0" />-->
         </node>
 
         <!-- Spawn an image_proc/rectify nodelet to rectify the depth to RGB image -->
@@ -64,7 +64,7 @@
               respawn="true">
             <remap from="image_mono"  to="ir/image_raw" />
             <remap from="image_rect"  to="ir/image_rect" />
-            <param name="interpolation" value="0" />
+            <!--<param name="interpolation" value="0" />-->
         </node>
 
         <group if="$(arg point_cloud)">

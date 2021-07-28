@@ -49,8 +49,10 @@ class RobotControl {
 
   ros::NodeHandle nh_;
   ros::Publisher pub_desired_pose_;
+  ros::Publisher pub_arm_;
   ros::Subscriber sub_pose_;
   geometry_msgs::Pose curr_pose_;
+  sensor_msgs::PointCloud2 arm_cloud_msg;
   geometry_msgs::Pose prev_pose_;
   std::vector<geometry_msgs::Pose> poses_;
   void init_position(const geometry_msgs::PoseStampedConstPtr &position_msg);
@@ -66,6 +68,16 @@ RobotControl::RobotControl(ros::NodeHandle nh): nh_(nh) {
   read_positions();
   sub_pose_ = nh.subscribe("/iiwa/command/CartesianPose", 30, &RobotControl::init_position, this);
   pub_desired_pose_ = nh_.advertise<geometry_msgs::PoseStamped>("/iiwa/command/CartesianPose",10);
+  pub_arm_ = nh_.advertise<sensor_msgs::PointCloud2>("/arm_cloud",10);
+
+  auto artery_cloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+  auto arm_cloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+  auto transformed_cloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
+
+  if (pcl::io::loadPCDFile<pcl::PointXYZ> ("/home/nehil/catkin_ws_registration/src/arm_downsampled_robot_base.pcd", *arm_cloud) == -1) //* load the arm
+  {
+    PCL_ERROR ("Couldn't read file\n");
+  }
 
   // publish the initial position
   geometry_msgs::PoseStamped command;
@@ -82,6 +94,10 @@ RobotControl::RobotControl(ros::NodeHandle nh): nh_(nh) {
   command.pose.orientation.w = init_pose[6];
   prev_pose_ = command.pose;
 
+
+  pcl::toROSMsg(*arm_cloud, arm_cloud_msg);
+  arm_cloud_msg.header.frame_id = BASE_LINK;
+
   std::cout << "prev pose : " << prev_pose_ << std::endl;
 
   pub_desired_pose_.publish(command);
@@ -95,6 +111,7 @@ void RobotControl::init_position(const geometry_msgs::PoseStampedConstPtr &posit
 
   if (std::abs(prev_pose_.position.x-init_pose.position.x)+std::abs(prev_pose_.position.y-init_pose.position.y)+std::abs(prev_pose_.position.z-init_pose.position.z) < 0.0001) {
     if(pose_ind < poses_.size()) {
+      pub_arm_.publish(arm_cloud_msg);
       geometry_msgs::PoseStamped command;
       command.header.frame_id = BASE_LINK;
       command.pose = poses_[pose_ind];

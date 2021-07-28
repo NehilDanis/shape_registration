@@ -1,0 +1,15 @@
+<launch>
+    <!-- STEP 1: START CAMERA DRIVER -->
+    <!-- Includes from other ROS packages-->
+    <include file="$(find shape_registration)/launch/start_azure_rectifiers.launch"/>
+
+
+    <!-- STEP 2: RUN THE NODE WHICH WILL CROP THE ROI AND GENERATE THE POINTCLOUD -->
+    <node pkg="shape_registration" type="test_depth_projection_node" name="test_depth_proj" output="screen">
+        <remap from="/camera_info" to="/k4a/depth_to_rgb/camera_info"/>
+        <remap from="/depth_to_rgb_image" to="/k4a/depth_to_rgb/image_rect"/>
+        <remap from="/rgb_image" to="/k4a/rgb/image_rect_color"/>
+        <remap from="/depth_camera_info" to="/k4a/depth/camera_info"/>
+        <remap from="/depth_image" to="/k4a/depth/image_rect"/>
+    </node>
+</launch>

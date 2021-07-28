@@ -38,6 +38,8 @@ private:
    */
   void compute(const sensor_msgs::PointCloud2ConstPtr& ros_cloud);
 
+  void calculate_rotation();
+
 private:
   float m_voxel_size;
   std::shared_ptr<ICPAlgorithm> shape_registration;
@@ -53,6 +55,7 @@ private:
   std::string m_data_path;
   std::string m_artery_data_path;
   PointCloudT m_source_cloud;
+  PointCloudT m_ct_cloud_normal;
   PointCloudT m_target_cloud;
   PointCloudT m_artery_cloud;
   geometry_msgs::TransformStamped transformStamped;

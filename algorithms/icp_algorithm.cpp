@@ -133,7 +133,7 @@ PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &ta
   ROS_INFO("has converged : %d", this->icp.hasConverged());
   ROS_INFO("score : %f", this->icp.getFitnessScore());
 
-  if(this->icp.hasConverged() && this->icp.getFitnessScore() < 0.0004) {
+  if(this->icp.hasConverged() && this->icp.getFitnessScore() < 0.0003) {
     return final_cloud;
   }
   final_cloud.clear();

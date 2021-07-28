@@ -2,6 +2,7 @@
 * STD INCLUDES
 *******************************************************************/
 #include <iostream>
+#include <yaml-cpp/yaml.h>
 
 /*******************************************************************
 * ROS INCLUDES
@@ -50,7 +51,7 @@ public:
 
 private:
     ros::NodeHandle nh_;
-
+    geometry_msgs::TransformStamped transformStamped;
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> sync_pol;
     typedef message_filters::Synchronizer<sync_pol> Sync;
     boost::shared_ptr<Sync> sync;
@@ -65,16 +66,32 @@ Fusion_and_Publish::Fusion_and_Publish()
 {
     int board_x;
     int board_y;
+    std::string calibration_file_path;
+    nh_.getParam("chessboard_calibration/calibration_file_path", calibration_file_path);
     nh_.getParam("chessboard_calibration/board_x", board_x);
     nh_.getParam("chessboard_calibration/board_y", board_y);
     board_size = cv::Size(board_x, board_y);
+    // read the calibration data from yaml file
+
+    YAML::Node config = YAML::LoadFile(calibration_file_path);
+    YAML::Node attributes = config["transformation"];
+
+    transformStamped.transform.rotation.x = attributes["qx"].as<double>();
+    transformStamped.transform.rotation.y = attributes["qy"].as<double>();
+    transformStamped.transform.rotation.z = attributes["qz"].as<double>();
+    transformStamped.transform.rotation.w = attributes["qw"].as<double>();
+
+    transformStamped.transform.translation.x = attributes["x"].as<double>();
+    transformStamped.transform.translation.y = attributes["y"].as<double>();
+    transformStamped.transform.translation.z = attributes["z"].as<double>();
+
     depth_sub.subscribe(nh_, "/depth_to_rgb_image", 1);
     color_sub.subscribe(nh_, "/rgb_image", 1);
     cam_info_sub.subscribe(nh_, "/camera_info", 1);
     sync.reset(new Sync(sync_pol(5),depth_sub, color_sub, cam_info_sub));
     sync->registerCallback(boost::bind(&Fusion_and_Publish::callback,this,_1,_2,_3));
     cv::namedWindow("Extractcorner",0);
-    cv::resizeWindow("Extractcorner", 1080, 1920);
+    cv::resizeWindow("Extractcorner", 1440, 2560);
 }
 
 void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image, const sensor_msgs::ImageConstPtr &color_image,
@@ -120,31 +137,17 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
         cv::cornerSubPix(imageGray, corners, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 100, 0.001));
     }
 
-
-    // 1.1343385552084106 0.18684291597759045 0.5855197817662712 -0.640603326420202 -0.6093896568468945 0.31527794174594137 0.34477738289487503
-
-    // TODO read the transformation from the YAML file in /home/nehil/.ros/easy_handeye/iiwa_azure_kinect_eye_on_base.yaml
-
-    geometry_msgs::TransformStamped transformStamped;
-    transformStamped.transform.rotation.x = -0.640603326420202;
-    transformStamped.transform.rotation.y = -0.6093896568468945;
-    transformStamped.transform.rotation.z = 0.31527794174594137;
-    transformStamped.transform.rotation.w = 0.34477738289487503;
-    transformStamped.transform.translation.x = 1.1343385552084106;
-    transformStamped.transform.translation.y = 0.18684291597759045;
-    transformStamped.transform.translation.z = 0.5855197817662712;
-
     std::cout << transformStamped << std::endl;
 
     for(std::size_t i = 0; i < corners.size(); i++)
     {
-        //cv::circle(chessboard, corners[i], 2, cv::Scalar(255, 0, 255), 2, 8);
-        //cv::putText(chessboard,std::to_string(i+1) , corners[i], cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 255), 1, 8);
+        cv::circle(chessboard, corners[i], 1, cv::Scalar(255, 0, 255), 2, 8);
+        cv::putText(chessboard,std::to_string(i+1) , corners[i], cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 255), 1, 8);
 
         geometry_msgs::Point32 tempPoint;
         tempPoint.z = cv_ptr_depth->image.at<float>(static_cast<int>(corners[i].y), static_cast<int>(corners[i].x));
         tempPoint.x = (corners[i].x - cx) * tempPoint.z / fx;
-        tempPoint.y = (corners[i].y - cy) * tempPoint.z / fy;
+        tempPoint.y = (corners[i].y - cy) * tempPoint.z / fx;
 
         geometry_msgs::PointStamped  transformed_pt ;
         geometry_msgs::PointStamped  initial_pt;
@@ -158,14 +161,14 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
          tempPoint.y = transformed_pt.point.y;
          tempPoint.z = transformed_pt.point.z;
 
-         std::cout << i+1 << ":  [" <<transformed_pt.point.x <<", "<<transformed_pt.point.y<<", "<<transformed_pt.point.z<<"]"<<std::endl;
+         std::cout << i+1 << ":  [" << 1000 * transformed_pt.point.x <<", "<< 1000 * transformed_pt.point.y<<", "<< 1000 * transformed_pt.point.z<<"]"<<std::endl;
          if(i+1 == 21) {
            //std::cout << i+1 << ":  ["<<tempPoint.x <<", "<<tempPoint.y<<", "<<tempPoint.z<<"]"<<std::endl;
          }
     }
 
     //xyz_pub_.publish(points);
-    cv::drawChessboardCorners( chessboard, board_size, cv::Mat(corners), patternfound );
+    //cv::drawChessboardCorners( chessboard, board_size, cv::Mat(corners), patternfound );
     cv::imshow("Extractcorner", chessboard);
     cv::waitKey(10);
 }

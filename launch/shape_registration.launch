@@ -2,10 +2,10 @@
 <!-- Common arguments -->
 
 <arg name="voxel_size" default="0.015"/>
-<arg name="CT_arm_data_path" default="/home/nehil/Desktop/slicer_results/arm.pcd"/>
-<arg name="CT_artery_data_path" default="/home/nehil/Desktop/slicer_results/artery.pcd"/>
-<arg name="segmented_CT_arm_data_path" default="/home/nehil/Desktop/slicer_results/plane_segmented_arm.pcd"/>
-<arg name="segmented_CT_artery_data_path" default="/home/nehil/Desktop/slicer_results/plane_segmented_artery.pcd"/>
+<arg name="CT_arm_data_path" default="/home/nehil/Documents/latest_slicer_data/arm.pcd"/>
+<arg name="CT_artery_data_path" default="/home/nehil/Documents/latest_slicer_data/artery.pcd"/>
+<arg name="segmented_CT_arm_data_path" default="/home/nehil/Documents/latest_slicer_data/plane_segmented_arm.pcd"/>
+<arg name="segmented_CT_artery_data_path" default="/home/nehil/Documents/latest_slicer_data/plane_segmented_artery.pcd"/>
 
 
 <!-- Nodes -->
@@ -17,7 +17,7 @@
     <param name="output_path_segmented_arm_data" type="string" value="$(arg segmented_CT_arm_data_path)"/>
     <param name="output_path_segmented_artery_data" type="string" value="$(arg segmented_CT_artery_data_path)"/>
     <param name="plane_segmentation_threshold_for_CT" type="double" value="23"/>
-    <param name="plane_segmentation_threshold_for_RGBD" type="double" value="0.010"/>
+    <param name="plane_segmentation_threshold_for_RGBD" type="double" value="0.020"/>
 </node>
 
 <!-- STEP 2: Register CT data with the point cloud data preprocessed in the previous step using ICP -->

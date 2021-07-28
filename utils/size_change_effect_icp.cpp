@@ -5,19 +5,99 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/common/common.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <random>
 
 using PointCloudNormal = pcl::PointCloud<pcl::Normal>;
 using Feature = pcl::FPFHSignature33;
 using FeatureCloud = pcl::PointCloud<Feature>;
 
 
+PointCloudT::Ptr add_gaussian_noise(PointCloudT::Ptr cloud) {
+  auto target_cloud = std::make_shared<PointCloudT>();
+  std::random_device rd{};
+  std::mt19937 gen{rd()};
+
+  // values near the mean are the most likely
+  // standard deviation affects the dispersion of generated values from the mean
+  // To make the normal distribution Gaussian, the mean needs to be 0 and the standard deviation needs to be 1.
+  std::normal_distribution<> dist{0, 0.002};
+  target_cloud->width = cloud->width;
+  target_cloud->height = cloud->height;
+  target_cloud->points.resize(cloud->points.size());
+
+  // go through every point in the point cloud and add random gaussian noise
+  for(size_t i = 0; i < cloud->points.size(); i ++) {
+    target_cloud->points[i].x = cloud->points[i].x + static_cast<float>(dist(gen));
+    target_cloud->points[i].y = cloud->points[i].y + static_cast<float>(dist(gen));
+    target_cloud->points[i].z = cloud->points[i].z + static_cast<float>(dist(gen));
+  }
+  return target_cloud;
+}
+
+void change_cloud_size(PointCloudT::Ptr) {
+  //
+}
+
+void transform_cloud(PointCloudT::Ptr cloud) {
+  // start with identity matrix as the transformation (4 X 4)
+  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+
+  // Define a rotation matrix (see https://en.wikipedia.org/wiki/Rotation_matrix)
+  // Below transformation matrix rotates the source around the z-axis by 45 degress
+  // and translates it in the x-axis by 0.25 meters. It is in the homogeneous format.
+  // cos(45)  -sin(45)   0   0.25
+  // -sin(45)  sin(45)   0    0
+  //    0           0    1    0
+  //    0           0    0    1
+  float theta = M_PI/4; // The angle of rotation in radians
+  transform (0,0) = std::cos (theta);
+  transform (0,1) = -sin(theta);
+  transform (1,0) = sin (theta);
+  transform (1,1) = std::cos (theta);
+
+  // Define a translation of 0.25 meters on the x axis.
+  transform (0,3) = 0.25;
+  //The transformation is applied to the source cloud
+  pcl::transformPointCloud (*cloud, *cloud, transform);
+}
+
+
+
 
 int main() {
+
+  /*PointCloudT::Ptr ct_arm_cloud (new PointCloudT);
+
+  if (pcl::io::loadPCDFile<PointT> ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm.pcd", *ct_arm_cloud) == -1) //* load the file
+  {
+    PCL_ERROR ("Couldn't read file\n");
+  }
+
+  PointCloudT::Ptr final_cloud (new PointCloudT);
+
+  if (pcl::io::loadPCDFile<PointT> ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm_transformed.pcd", *final_cloud) == -1) //* load the file
+  {
+    PCL_ERROR ("Couldn't read file\n");
+  }
+
+
+  pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
+  viewer->setBackgroundColor (1, 1, 1);
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (ct_arm_cloud, 0, 0, 255);
+  viewer->addPointCloud<PointT> (ct_arm_cloud, ct_arm_color, "target");
+
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> target_cloud_color (final_cloud, 255, 0, 0);
+  viewer->addPointCloud<PointT> (final_cloud, target_cloud_color, "result");
+
+  while (!viewer->wasStopped ())
+  {
+      viewer->spinOnce (100);
+  }*/
 
   // Generate icp algorithm object
   auto shape_registration = std::make_shared<ICPAlgorithm>(300);
 
-  // Read the data
+  // Read the ct data
 
   PointCloudT::Ptr ct_arm_cloud (new PointCloudT);
 
@@ -26,100 +106,64 @@ int main() {
     PCL_ERROR ("Couldn't read file\n");
   }
 
-  PointCloudT::Ptr cloud_artery (new PointCloudT);
-
-  if (pcl::io::loadPCDFile<PointT> ("/home/nehil/Desktop/slicer_results/artery.pcd", *cloud_artery) == -1) //* load the file
-  {
-    PCL_ERROR ("Couldn't read file\n");
-  }
-
-  // arm from the camera
-
-  PointCloudT::Ptr cam_arm_cloud (new PointCloudT);
-
-
-  if (pcl::io::loadPCDFile<PointT> ("/home/nehil/catkin_ws_registration/src/arm_downsampled.pcd", *cam_arm_cloud) == -1) //* load the arm
-  {
-    PCL_ERROR ("Couldn't read file\n");
-  }
-
-  // The scale difference between the Azure kinect camera and the CT is 1000
-  // below every point of MRI data is divided by 1000 to get the same scale of data with the camera.
   for (auto &point : ct_arm_cloud->points) {
     point.x = point.x / 1000;
     point.y = point.y / 1000;
     point.z = point.z / 1000;
   }
-  ct_arm_cloud = Preprocessing::voxel_grid_downsampling(ct_arm_cloud, 0.015f);
-  ct_arm_cloud = Preprocessing::statistical_filtering(ct_arm_cloud, 1.5);
 
+  // Add gaussian noise to the arm cloud and create the target data
 
-  for (auto &point : cloud_artery->points) {
-    point.x = point.x / 1000;
-    point.y = point.y / 1000;
-    point.z = point.z / 1000;
-  }
-  cloud_artery = Preprocessing::voxel_grid_downsampling(cloud_artery, 0.015f);
-  cloud_artery = Preprocessing::statistical_filtering(cloud_artery, 1.5);
+  auto target = add_gaussian_noise(ct_arm_cloud);
+  transform_cloud(target);
+
+  target = Preprocessing::voxel_grid_downsampling(target, 0.015f);
+  target = Preprocessing::statistical_filtering(target, 1.5);
+
+  pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm_transformed.pcd", *target);
 
 
   //// This section moves the source center closer to the target center. This section takes 0.002433 seconds.
   PointT centroid_s;
-  pcl::computeCentroid(*ct_arm_cloud, centroid_s);
+  pcl::computeCentroid(*target, centroid_s);
   PointT centroid_t;
-  pcl::computeCentroid(*cam_arm_cloud, centroid_t);
+  pcl::computeCentroid(*ct_arm_cloud, centroid_t);
 
   PointT diff;
   diff.x = centroid_t.x - centroid_s.x;
   diff.y = centroid_t.y - centroid_s.y;
   diff.z = centroid_t.z - centroid_s.z;
 
-  for (auto &point : ct_arm_cloud->points) {
+  for (auto &point : target->points) {
     point.x = point.x + diff.x;
     point.y = point.y + diff.y;
     point.z = point.z + diff.z;
   }
 
-  for (auto &point : cloud_artery->points) {
-    point.x = point.x + diff.x;
-    point.y = point.y + diff.y;
-    point.z = point.z + diff.z;
-  }
+  shape_registration->get_initial_transformation(target, ct_arm_cloud);
 
-  shape_registration->get_initial_transformation(ct_arm_cloud, cam_arm_cloud);
-
-  /**
-   Transform the source point cloud given the alignment
-   */
-
-   pcl::transformPointCloud(*ct_arm_cloud, *ct_arm_cloud, shape_registration->transformation);
-
-   pcl::transformPointCloud(*cloud_artery, *cloud_artery, shape_registration->transformation);
+   pcl::transformPointCloud(*target, *target, shape_registration->transformation);
 
 
-   PointCloudT final_cloud = shape_registration->compute(ct_arm_cloud, cam_arm_cloud);
+   auto final_cloud = std::make_shared<PointCloudT>(shape_registration->compute(target, ct_arm_cloud));
 
-   if (final_cloud.size() != 0) {
-     pcl::transformPointCloud(*cloud_artery, *cloud_artery, shape_registration->get_ICP_obj().getFinalTransformation());
+   // Save the points to pcd file.
+   pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm_transformed.pcd", *final_cloud);
+   pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm.pcd", *ct_arm_cloud);
 
-     pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
-     viewer->setBackgroundColor (1, 1, 1);
-     pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (ct_arm_cloud, 0, 0, 255);
-     viewer->addPointCloud<PointT> (ct_arm_cloud, ct_arm_color, "ct_arm");
+   if (final_cloud->points.size() != 0) {
+      pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
+      viewer->setBackgroundColor (1, 1, 1);
+      pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (ct_arm_cloud, 0, 0, 255);
+      viewer->addPointCloud<PointT> (ct_arm_cloud, ct_arm_color, "target");
 
-     pcl::visualization::PointCloudColorHandlerCustom<PointT> cam_arm_color (cam_arm_cloud, 255, 0, 0);
-     viewer->addPointCloud<PointT> (cam_arm_cloud, cam_arm_color, "cam_arm");
+      pcl::visualization::PointCloudColorHandlerCustom<PointT> target_cloud_color (final_cloud, 255, 0, 0);
+      viewer->addPointCloud<PointT> (final_cloud, target_cloud_color, "result");
 
-     pcl::visualization::PointCloudColorHandlerCustom<PointT> result_color (std::make_shared<PointCloudT>(final_cloud), 0, 255, 0);
-     viewer->addPointCloud<PointT> (std::make_shared<PointCloudT>(final_cloud), result_color, "result_arm");
-     while (!viewer->wasStopped ())
-     {
-         viewer->spinOnce (100);
-     }
-
+      while (!viewer->wasStopped ())
+      {
+          viewer->spinOnce (100);
+      }
    }
-
-
-
   return 0;
 }

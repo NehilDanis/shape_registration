@@ -27,10 +27,14 @@ class MovementDetector():
         union = np.logical_or(prev_mask, curr_mask)
         return np.sum(intersection) / np.sum(union)
 
+    def create_pointcloud(self):
+        pass
+
     def callback(self, img_msg):
         if self.prev_img is None:
             img = self.bridge.imgmsg_to_cv2(img_msg, "mono8")
             self.prev_img = img
+            # create pointcloud of the prev mask
             self.msg_count += 1
         else:
             if(self.msg_count == 2):
@@ -41,7 +45,15 @@ class MovementDetector():
                 print(self.dice_score(self.prev_img, img))
                 print(self.iou_score(self.prev_img, img))
                 print("---------------")
+
+                # if the similarity is lower than some threshold then there is movement
+                # below section will be completed in another file
+                # publish both the prev and curr pointcloud and apply icp on them
+                # then publish the transformation in the robot base
+
+
                 self.prev_img = img
+                # create pointcloud of the prev mask
             else:
                 self.msg_count += 1
 

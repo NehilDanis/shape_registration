@@ -62,6 +62,8 @@ PointCloudT::Ptr statistical_filtering(PointCloudT::Ptr &input_cloud, double std
   sor.setMeanK (50);
   sor.setStddevMulThresh (std_dev);
   sor.filter (*cloud_filtered);
+  std::cout << "Applied the filter" << std::endl;
+  std::cout << cloud_filtered->points.size() << std::endl;
 
   return cloud_filtered;
 }
@@ -137,7 +139,7 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   //unsigned int num_points = 0;
   for(const auto &point : cloud_outliers->points) {
     float plane_side = a * point._PointXYZ::x + b * point._PointXYZ::y + c * point._PointXYZ::z + d;
-    if(plane_side > 0) {
+    if(plane_side < 0) {
       cloud_outliers_one_side_plane->points.push_back(point);
       //num_points++;
     }

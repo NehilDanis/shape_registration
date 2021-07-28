@@ -26,7 +26,7 @@
         <arg name="square_number_x" value="4"/>
         <arg name="square_number_y" value="4"/>
         <arg name="square_size" value="0.035"/>
-        <arg name="marker_size" value="0.027"/>
+        <arg name="marker_size" value="0.026"/>
         <arg name="reference_frame" value="rgb_camera_link"/>
         <arg name="camera_frame" value="rgb_camera_link"/>
     </include>
@@ -57,13 +57,11 @@
     <!-- (start your robot's MoveIt! stack, e.g. include its moveit_planning_execution.launch) -->
     <!-- (start your tracking system's ROS driver) -->
 
-    <!--<include file="$(find easy_handeye)/launch/publish.launch">
+    <include file="$(find easy_handeye)/launch/publish.launch">
         <arg name="eye_on_hand" value="false" />
         <arg name="namespace_prefix" value="$(arg namespace_prefix)" />
         <arg name="robot_base_frame" value="iiwa_link_0" />
         <arg name="tracking_base_frame" value="rgb_camera_link" />
-    </include>-->
-
-
+    </include>
 
 </launch>
