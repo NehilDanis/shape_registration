@@ -37,6 +37,11 @@
 #include <cmath>
 
 
+/***
+ * This file is used to check the depth values, the user needs to draw a line on the given image
+ * using the mouse, and the depth values along the line will be printed.
+ * */
+
 namespace  {
   bool _line = false;
   bool leftDown = true;

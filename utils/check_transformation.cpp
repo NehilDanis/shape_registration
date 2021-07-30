@@ -14,6 +14,13 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 
+/***
+ * This file is written to check the difference between tf2::doTransform and
+ * pcl::transformPointCloud. They gave exactly the same result. So using one another
+ * does not make any change!
+ * */
+
+
 int main() {
   // Read the data
 

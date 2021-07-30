@@ -6,6 +6,13 @@
 #include <pcl/common/common.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+/***
+ *
+This file is used to test the icp result
+ *
+ * */
+
+
 struct callback_args{
   // structure used to pass arguments to the callback function
   PointCloudT::Ptr clicked_points_3d;

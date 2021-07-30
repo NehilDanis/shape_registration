@@ -38,6 +38,14 @@
 #include <Eigen/Core>
 
 
+/***
+ * After the trajectory is calculated and transformed into the robot base coordinate system
+ * then in this file the trajectory will be read from the file is is written in, and then
+ * a pose will get created and then be published to the topic /iiwa/command/CartesianPose
+ * this was you can move the real robot or the simulation.
+ * */
+
+
 
 #define SIM
 

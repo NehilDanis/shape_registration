@@ -11,6 +11,10 @@ using PointCloudNormal = pcl::PointCloud<pcl::Normal>;
 using Feature = pcl::FPFHSignature33;
 using FeatureCloud = pcl::PointCloud<Feature>;
 
+/***
+ * This file is used to check whether the size change effects the icp result or not
+ * */
+
 
 PointCloudT::Ptr add_gaussian_noise(PointCloudT::Ptr cloud) {
   auto target_cloud = std::make_shared<PointCloudT>();

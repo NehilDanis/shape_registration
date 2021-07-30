@@ -15,6 +15,10 @@ float z_min_val, z_max_val;
 float voxel_size;
 }
 
+/***
+ * This file is not used, needs to be deleted
+ * */
+
 void preprocessing_callback(const sensor_msgs::PointCloud2ConstPtr& colored_cloud){
 
   // Created a publisher to publish the results after preprocessing
