@@ -3,8 +3,9 @@
 import rospy
 import sys
 #import cv2
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 import Pyro5
+import message_filters
 import Pyro5.api
 import numpy as np
 #from cv_bridge import CvBridge, CvBridgeError
@@ -21,10 +22,19 @@ class PublisherPyro(object):
     def __init__(self, uri):
         self.called = False
         self.pyro_server = Pyro5.api.Proxy(uri)
-        self.sub = rospy.Subscriber("/k4a/rgb/image_rect_color", Image, self.callback)
-        self.pub = rospy.Publisher("mask", Image, queue_size=1)
+        self.image_sub = message_filters.Subscriber("/k4a/rgb/image_rect_color", Image)
+        self.depth_sub = message_filters.Subscriber("/k4a/depth_to_rgb/image_rect", Image)
+        self.cam_info_sub = message_filters.Subscriber("/k4a/depth_to_rgb/camera_info", CameraInfo)
 
-    def callback(self, img_msg):
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.cam_info_sub], 10, 0.1, allow_headerless=True)
+        self.ts.registerCallback(self.callback)
+        self.pub = rospy.Publisher("mask", Image, queue_size=1)
+        self.pub_img = rospy.Publisher("img", Image, queue_size=1)
+        self.pub_depth = rospy.Publisher("depth_img", Image, queue_size=1)
+        self.pub_cam_info = rospy.Publisher("cam_info", CameraInfo, queue_size=1)
+
+
+    def callback(self, img_msg, depth_msg, cam_info_msg):
         self.pyro_server._pyroClaimOwnership()
         #img1 = np.frombuffer(img_msg.data, dtype=np.uint8)
         #print(img1.shape)
@@ -36,6 +46,9 @@ class PublisherPyro(object):
         # the calculated mask using the segmentation network is published to the mask topic
         msg = Image()
         msg.header.stamp = rospy.Time.now()
+        img_msg.header.stamp = rospy.Time.now()
+        depth_msg.header.stamp = rospy.Time.now()
+        cam_info_msg.header.stamp = rospy.Time.now()
         msg.height = mask.shape[0]
         msg.width = mask.shape[1]
         msg.encoding = "mono8"
@@ -43,6 +56,9 @@ class PublisherPyro(object):
         msg.step = 1 * mask.shape[1]
         msg.data = np.array(mask).tobytes()
         self.pub.publish(msg)
+        self.pub_img.publish(img_msg)
+        self.pub_depth.publish(depth_msg)
+        self.pub_cam_info.publish(cam_info_msg)
 
 
 def main(args):

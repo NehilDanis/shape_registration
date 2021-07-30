@@ -78,6 +78,8 @@ add_executable(registration_node src/mri_camera_matching.cpp algorithms/icp_algo
 
 add_executable(arm_tracking_node src/arm_tracking.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
 
+add_executable(tracking src/tracking.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
+
 add_executable(pca_thing utils/find_pca_of_artery.cpp)
 
 add_executable(robot_controller utils/control_the_robot.cpp)
@@ -158,6 +160,15 @@ target_link_libraries(registration_node
 target_include_directories(arm_tracking_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
 message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
 target_link_libraries(arm_tracking_node
+   ${OpenCV_LIBS}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
+ )
+
+target_include_directories(tracking PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
+target_link_libraries(tracking
    ${OpenCV_LIBS}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
