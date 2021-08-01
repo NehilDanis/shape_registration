@@ -18,6 +18,14 @@
 #include <geometry_msgs/Point32.h>
 
 /*******************************************************************
+* OPENCV RELATED
+*******************************************************************/
+#include <opencv2/highgui/highgui.hpp>
+#include "opencv2/core/core.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+
+/*******************************************************************
 * SENSOR_FUSION INCLUDES
 *******************************************************************/
 #include <message_filters/subscriber.h>
@@ -32,6 +40,12 @@ geometry_msgs::TransformStamped transformStamped;
 Eigen::Matrix4d transformation_to_robot_base;
 std::unique_ptr<ICPAlgorithm> m_icp(new ICPAlgorithm(300));
 ros::Publisher m_pub_transformation;
+
+ros::Publisher m_pub_cloud_1;
+ros::Publisher m_pub_cloud_2;
+ros::Publisher m_pub_cloud_3;
+cv::Point pt_img_1;
+cv::Point pt_img_2;
 }
 
 void calculate_rotation(){
@@ -51,7 +65,22 @@ void calculate_rotation(){
 }
 
 
-void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_msg, const sensor_msgs::PointCloud2ConstPtr& curr_cloud_msg){
+static void onMouse(int event, int x, int y, int, void*) {
+
+  if(event==cv::EVENT_LBUTTONDOWN)
+    {
+      pt_img_1.x=x;
+      pt_img_1.y=y;
+    }
+    if(event==cv::EVENT_RBUTTONDOWN)
+    {
+      pt_img_2.x=x;
+      pt_img_2.y=y;
+    }
+}
+
+
+void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_msg, const sensor_msgs::PointCloud2ConstPtr& curr_cloud_msg, const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg){
   PointCloudT::Ptr prev_ptr (new PointCloudT);
   PointCloudT::Ptr curr_ptr (new PointCloudT);
 
@@ -86,7 +115,100 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
   movement.transform.rotation.y = q.y();
   movement.transform.rotation.z = q.z();
   movement.transform.rotation.w = q.w();
+
+  double x = movement.transform.translation.x;
+  double y = movement.transform.translation.y;
+  double z = movement.transform.translation.z;
+
+  double qw = movement.transform.rotation.w;
+  double qx = movement.transform.rotation.x;
+  double qy = movement.transform.rotation.y;
+  double qz = movement.transform.rotation.z;
+
+  Eigen::Matrix4d movement_transform;
+  movement_transform << 2 * (std::pow(qw, 2) + std::pow(qx, 2)) - 1, 2 * (qx*qy - qw*qz), 2 * (qx*qz + qw*qy), x,
+                                  2 * (qx*qy + qw*qz), 2 * (std::pow(qw, 2) + std::pow(qy, 2)) - 1, 2 * (qy*qz - qw*qx), y,
+                                  2 * (qx*qz - qw*qy), 2 * (qy*qz + qw*qx), 2 * (std::pow(qw, 2) + std::pow(qz, 2)) - 1, z,
+                                  0                                          , 0                   , 0                 , 1;
+
   m_pub_transformation.publish(movement);
+
+
+  float cx = static_cast<float>(cam_info_msg->K.at(2));
+  float cy = static_cast<float>(cam_info_msg->K.at(5));
+  float fx = static_cast<float>(cam_info_msg->K.at(0));
+  float fy = static_cast<float>(cam_info_msg->K.at(4));
+
+
+  auto prev = cv_bridge::toCvCopy(prev_img_msg, sensor_msgs::image_encodings::BGR8)->image;
+  cv::imshow("view", prev);
+  cv::setMouseCallback("view", onMouse);
+  cv::waitKey(0);
+  cv::destroyWindow("view");
+
+  auto curr = cv_bridge::toCvCopy(curr_img_msg, sensor_msgs::image_encodings::BGR8)->image;
+  cv::imshow("view2", curr);
+  cv::setMouseCallback("view2", onMouse);
+  cv::waitKey(0);
+  cv::destroyWindow("view2");
+  std::cout << pt_img_1 << std::endl;
+  std::cout << pt_img_2 << std::endl;
+
+  auto prev_depth = cv_bridge::toCvCopy(prev_img_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+  auto curr_depth = cv_bridge::toCvCopy(curr_img_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+
+  pcl::PointCloud<pcl::PointXYZ> cloud1;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud2;
+  pcl::PointCloud<pcl::PointXYZ> cloudresult;
+
+  float depth_img_1 = prev_depth->image.at<float>(static_cast<int>(pt_img_1.y), static_cast<int>(pt_img_1.x));
+  float depth_img_2 = curr_depth->image.at<float>(static_cast<int>(pt_img_2.y), static_cast<int>(pt_img_2.x));
+  if(depth_img_1 != 0.0f && depth_img_2 != 0.0f) {
+    pcl::PointXYZ pt_1;
+    pcl::PointXYZ pt_2;
+    pcl::PointXYZ pt_result;
+    pt_1.x = depth_img_1 * (int(pt_img_1.x) - cx) / fx;
+    pt_1.y = depth_img_1 * (int(pt_img_1.y) - cy) / fy;
+    pt_1.z = depth_img_1;
+
+    pt_2.x = depth_img_2 * (int(pt_img_2.x) - cx) / fx;
+    pt_2.y = depth_img_2 * (int(pt_img_2.y) - cy) / fy;
+    pt_2.z = depth_img_2;
+
+    cloud1.push_back(pt_1);
+    cloud2.push_back(pt_2);
+    cloudresult.push_back(pt_result);
+    std::cout << pt_1 << std::endl;
+    std::cout << pt_2 << std::endl;
+
+    Eigen::Vector4d u(pt_1.x, pt_1.y, pt_1.z, 1.0f);
+    auto result = movement_transform * u;
+    pt_result.x = result.x();
+    pt_result.y = result.y();
+    pt_result.z = result.z();
+
+    std::cout << result << std::endl;
+    sensor_msgs::PointCloud2 msg_1;
+    pcl::toROSMsg(cloud1, msg_1);
+    msg_1.header.frame_id = "rgb_camera_link";
+    msg_1.header.stamp = ros::Time::now();
+    m_pub_cloud_1.publish(msg_1);
+
+    sensor_msgs::PointCloud2 msg_2;
+    pcl::toROSMsg(cloud2, msg_2);
+    msg_2.header.frame_id = "rgb_camera_link";
+    msg_2.header.stamp = ros::Time::now();
+    m_pub_cloud_2.publish(msg_2);
+
+    sensor_msgs::PointCloud2 msg_3;
+    pcl::toROSMsg(cloudresult, msg_3);
+    msg_3.header.frame_id = "rgb_camera_link";
+    msg_3.header.stamp = ros::Time::now();
+    m_pub_cloud_3.publish(msg_2);
+
+
+  }
 
 }
 
@@ -107,19 +229,38 @@ int main(int argc, char** argv) {
 
   calculate_rotation();
 
-  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2> sync_pol;
+  typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::Image, sensor_msgs::CameraInfo> sync_pol;
   typedef message_filters::Synchronizer<sync_pol> Sync;
   boost::shared_ptr<Sync> sync;
   message_filters::Subscriber<sensor_msgs::PointCloud2> prev_cloud_sub;
   message_filters::Subscriber<sensor_msgs::PointCloud2> curr_cloud_sub;
+
+  message_filters::Subscriber<sensor_msgs::Image> prev_img_sub;
+  message_filters::Subscriber<sensor_msgs::Image> curr_img_sub;
+  message_filters::Subscriber<sensor_msgs::Image> prev_img_depth_sub;
+  message_filters::Subscriber<sensor_msgs::Image> curr_img_depth_sub;
+  message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub;
+
   m_pub_transformation = nh.advertise<geometry_msgs::TransformStamped>("/transformation", 1);
+
+  m_pub_cloud_1 = nh.advertise<sensor_msgs::PointCloud2>("/cloud_1", 1);
+  m_pub_cloud_2 = nh.advertise<sensor_msgs::PointCloud2>("/cloud_2", 1);
+  m_pub_cloud_3 = nh.advertise<sensor_msgs::PointCloud2>("/cloud_result", 1);
 
   prev_cloud_sub.subscribe(nh, "movement_start", 1);
   curr_cloud_sub.subscribe(nh, "movement_end", 1);
 
+  prev_img_sub.subscribe(nh, "movement_start_img", 1);
+  curr_img_sub.subscribe(nh, "movement_end_img", 1);
 
-  sync.reset(new Sync(sync_pol(5), prev_cloud_sub, curr_cloud_sub));
-  sync->registerCallback(boost::bind(calculate_trasformation, _1, _2));
+  prev_img_depth_sub.subscribe(nh, "movement_start_depth", 1);
+  curr_img_depth_sub.subscribe(nh, "movement_end_depth", 1);
+
+  cam_info_sub.subscribe(nh, "cam_info_move", 1);
+
+
+  sync.reset(new Sync(sync_pol(5), prev_cloud_sub, curr_cloud_sub, prev_img_sub, curr_img_sub, prev_img_depth_sub, curr_img_depth_sub, cam_info_sub));
+  sync->registerCallback(boost::bind(calculate_trasformation, _1, _2, _3, _4, _5, _6, _7));
 
   ros::spin();
   return 0;
