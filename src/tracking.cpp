@@ -104,6 +104,7 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
   m_icp->compute(prev_ptr, curr_ptr);
 
   auto transformation = m_icp->get_ICP_obj().getFinalTransformation();
+
   Eigen::Quaternionf q(transformation.block<3,3>(0,0));
   geometry_msgs::TransformStamped movement;
   movement.header = prev_cloud_msg->header;
@@ -179,16 +180,23 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
     cloud1.push_back(pt_1);
     cloud2.push_back(pt_2);
     cloudresult.push_back(pt_result);
-    std::cout << pt_1 << std::endl;
-    std::cout << pt_2 << std::endl;
+    //std::cout << pt_1 << std::endl;
 
     Eigen::Vector4d u(pt_1.x, pt_1.y, pt_1.z, 1.0f);
     auto result = movement_transform * u;
     pt_result.x = result.x();
     pt_result.y = result.y();
     pt_result.z = result.z();
+    std::cout << "Selected point: " <<  pt_2 << std::endl;
+    std::cout << "Transformed point: " << pt_result << std::endl;
 
-    std::cout << result << std::endl;
+
+    // find euclidean distance
+
+    auto distance = std::sqrt(std::pow(pt_2.x - pt_result.x, 2) + std::pow(pt_2.y - pt_result.y, 2) + std::pow(pt_2.z - pt_result.z, 2));
+
+    std::cout << "Error: " << distance *  1000 << " mm" << std::endl;
+
     sensor_msgs::PointCloud2 msg_1;
     pcl::toROSMsg(cloud1, msg_1);
     msg_1.header.frame_id = "rgb_camera_link";

@@ -93,6 +93,7 @@ add_executable(transformation_checker_node utils/check_transformation.cpp)
 add_executable(test_depth_vals_node utils/test_depth_vals.cpp)
 
 
+
 target_link_libraries(test_depth_vals_node
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
@@ -131,6 +132,7 @@ target_link_libraries(test_depth_projection_node
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
  )
+
 
 target_link_libraries(preprocessing_node
    ${OpenCV_LIBS}

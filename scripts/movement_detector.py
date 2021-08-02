@@ -94,6 +94,11 @@ class MovementDetector():
         self.prev_mask = None
         self.prev_depth = None
         self.prev_img = None
+
+        self.last_stable_mask = None
+        self.last_stable_depth = None
+        self.last_stable_img = None
+
         self.start_img = None
         self.end_img = None
         self.start_img_depth = None
@@ -157,22 +162,15 @@ class MovementDetector():
 
         if self.prev_mask is not None:
             if not self.robot_stop:
-                # find the intersection over union between current and previour image
-
-                #print(self.dice_score(self.prev_mask, mask))
-                #print(self.iou_score(self.prev_mask, mask))
+                # if the robot is not stopped then check for the motion
 
                 if(self.dice_score(self.prev_mask, mask) < 0.95):
                     # movement occured
                     print("stop robot")
                     self.robot_stop = True
-                    self.start_img = self.prev_img
-                    self.start_img_depth = self.prev_depth
-                    self.prev_pointcloud_msg = self.create_pointcloud(self.prev_img, self.prev_depth, cam_info_msg, self.prev_mask)
-                    #curr_pointcloud_msg = self.create_pointcloud(img, depth_img, cam_info_msg, mask)
-
-                    #self.movement_start.publish(prev_pointcloud_msg)
-                    #self.movement_end.publish(curr_pointcloud_msg)
+                    self.start_img = self.last_stable_img
+                    self.start_img_depth = self.last_stable_depth
+                    self.prev_pointcloud_msg = self.create_pointcloud(self.last_stable_img, self.last_stable_depth, cam_info_msg, self.last_stable_mask)
 
                     movement_detected_msg = Bool()
                     movement_detected_msg.data = True
@@ -181,7 +179,7 @@ class MovementDetector():
             elif self.robot_stop and button_pressed:
                 # if the robot is stopped and the button to restart it is pressed then, this if statement
                 # will run
-                print("heyy")
+                print("Robot restarted!")
                 self.robot_stop = False
                 button_pressed = False
 
@@ -203,10 +201,20 @@ class MovementDetector():
                 self.movement_end_depth.publish(img_end_depth_msg)
                 self.camera_info_move.publish(cam_info_msg)
 
+                self.last_stable_mask = mask
+                self.last_stable_depth = depth_img
+                self.last_stable_img = img
 
+        else:
+            # the first frame will be the first last_stable_frame
+            # also it will be prev_frame
+            self.last_stable_mask = mask
+            self.last_stable_depth = depth_img
+            self.last_stable_img = img
         self.prev_mask = mask
         self.prev_img = img
         self.prev_depth = depth_img
+
 
 
 def main(args):
