@@ -128,6 +128,7 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   extract.setNegative(false);     // Extract the inliers
   extract.filter(*cloud_inliers); // cloud_inliers contains the plane
 
+
   // Extract outliers
   extract.setNegative(true); // Extract the outliers
   extract.filter(*cloud_outliers);
@@ -137,19 +138,35 @@ PointCloudT::Ptr extract_plane(PointCloudT::Ptr &input_cloud, double threshold) 
   auto c = plane->values[2];
   auto d = plane->values[3];
   //unsigned int num_points = 0;
+  Eigen::Vector3f normal_vec(a, b, c);
+  Eigen::Vector3f cam_y(0, -1, 0);
+  auto dot_product = normal_vec.transpose() * cam_y;
+  bool larger = false;
+  if(dot_product > 0) {
+    // normal vector is showing up
+    larger = true;
+  }
   for(const auto &point : cloud_outliers->points) {
     float plane_side = a * point._PointXYZ::x + b * point._PointXYZ::y + c * point._PointXYZ::z + d;
-    if(plane_side < 0) {
-      cloud_outliers_one_side_plane->points.push_back(point);
-      //num_points++;
+    if(larger) {
+      if(plane_side > 0) {
+        cloud_outliers_one_side_plane->points.push_back(point);
+        //num_points++;
+      }
+    }
+    else{
+      if(plane_side <= 0) {
+        cloud_outliers_one_side_plane->points.push_back(point);
+        //num_points++;
+      }
     }
   }
 
   //cloud_outliers_one_side_plane->width = num_points;
   //cloud_outliers_one_side_plane->height = 1;
 
-
-  return  cloud_outliers_one_side_plane;
+  //return  cloud_outliers_one_side_plane;
+  return cloud_outliers_one_side_plane;
 }
 
 void visualize_point_cloud(const PointCloudT &source) {
