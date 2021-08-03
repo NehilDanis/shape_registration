@@ -147,7 +147,9 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
         geometry_msgs::Point32 tempPoint;
         tempPoint.z = cv_ptr_depth->image.at<float>(static_cast<int>(corners[i].y), static_cast<int>(corners[i].x));
         tempPoint.x = (corners[i].x - cx) * tempPoint.z / fx;
-        tempPoint.y = (corners[i].y - cy) * tempPoint.z / fx;
+        // below line can be changed.
+        //tempPoint.y = (corners[i].y - cy) * tempPoint.z / fx;
+        tempPoint.y = (corners[i].y - cy) * tempPoint.z / fy;
 
         geometry_msgs::PointStamped  transformed_pt ;
         geometry_msgs::PointStamped  initial_pt;
