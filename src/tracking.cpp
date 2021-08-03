@@ -24,6 +24,7 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
+#include <opencv2/calib3d/calib3d.hpp>
 
 /*******************************************************************
 * SENSOR_FUSION INCLUDES
@@ -38,12 +39,16 @@ YAML::Node attributes = config["transformation"];
 float m_voxel_size;
 geometry_msgs::TransformStamped transformStamped;
 Eigen::Matrix4d transformation_to_robot_base;
-std::unique_ptr<ICPAlgorithm> m_icp(new ICPAlgorithm(300));
+std::unique_ptr<ICPAlgorithm> m_icp(new ICPAlgorithm(1500));
 ros::Publisher m_pub_transformation;
 
 ros::Publisher m_pub_cloud_1;
 ros::Publisher m_pub_cloud_2;
 ros::Publisher m_pub_cloud_3;
+
+ros::Publisher movement_start_pub;
+ros::Publisher movement_end_pub;
+
 cv::Point pt_img_1;
 cv::Point pt_img_2;
 }
@@ -79,62 +84,103 @@ static void onMouse(int event, int x, int y, int, void*) {
     }
 }
 
+std::vector<Eigen::Vector4d> find_corners(cv_bridge::CvImageConstPtr cv_ptr_color, cv_bridge::CvImageConstPtr cv_ptr_depth, const sensor_msgs::CameraInfoConstPtr& cam_info_msg) {
+  int board_x = 7;
+  int board_y = 6;
+  auto board_size = cv::Size(board_x, board_y);
 
-void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_msg, const sensor_msgs::PointCloud2ConstPtr& curr_cloud_msg, const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg){
-  PointCloudT::Ptr prev_ptr (new PointCloudT);
-  PointCloudT::Ptr curr_ptr (new PointCloudT);
+  float cx = static_cast<float>(cam_info_msg->K.at(2));
+  float cy = static_cast<float>(cam_info_msg->K.at(5));
+  float fx = static_cast<float>(cam_info_msg->K.at(0));
+  float fy = static_cast<float>(cam_info_msg->K.at(4));
 
-  pcl::fromROSMsg(*prev_cloud_msg, *prev_ptr);
-  pcl::fromROSMsg(*curr_cloud_msg, *curr_ptr);
+  //Detect corners of chessboard
+  cv::Mat chessboard = cv_ptr_color->image;
+  cv::Mat Extractcorner = chessboard.clone();
+  std::vector<cv::Point2f> corners;
+  cv::Mat imageGray;
+  cv::cvtColor(Extractcorner, imageGray, CV_RGB2GRAY);
 
-  prev_ptr = Preprocessing::voxel_grid_downsampling(prev_ptr, 0.015f);
-  prev_ptr = Preprocessing::statistical_filtering(prev_ptr, 1.0);
+  bool patternfound = cv::findChessboardCorners(Extractcorner, board_size, corners, cv::CALIB_CB_ADAPTIVE_THRESH + cv::CALIB_CB_NORMALIZE_IMAGE);
 
-  curr_ptr = Preprocessing::voxel_grid_downsampling(curr_ptr, 0.015f);
-  curr_ptr = Preprocessing::statistical_filtering(curr_ptr, 1.0);
+  if(!patternfound)
+  {
+      std::cout << "can not find chessboard corners!" << std::endl;
+      exit(1);
+  }
+  else
+  {
+      ROS_INFO_STREAM("FOUND");
+      cv::cornerSubPix(imageGray, corners, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 100, 0.001));
+  }
+  std::vector<Eigen::Vector4d> detected_corners;
+  for(std::size_t i = 0; i < corners.size(); i++)
+  {
+      cv::circle(chessboard, corners[i], 1, cv::Scalar(255, 0, 255), 2, 8);
+      cv::putText(chessboard,std::to_string(i+1) , corners[i], cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 255), 1, 8);
+      auto depth = cv_ptr_depth->image.at<float>(static_cast<int>(corners[i].y), static_cast<int>(corners[i].x));
+      Eigen::Vector4d tempPoint((corners[i].x - cx) * depth / fx,
+                                (corners[i].y - cy) * depth / fy,
+                                depth,
+                                1.0);
+      detected_corners.push_back(tempPoint);
 
-  // move the curr position to the robot base
-  //pcl::transformPointCloud(*curr_ptr, *curr_ptr, transformation_to_robot_base);
-  // move the prev position to the robot base
-  //pcl::transformPointCloud(*prev_ptr, *prev_ptr, transformation_to_robot_base);
+  }
+  cv::imshow("Extractcorner", chessboard);
+  cv::waitKey(0);
+  cv::destroyWindow("Extractcorner");
+  return detected_corners;
+}
 
+void calculate_error_using_chessboard_detection(const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg, Eigen::Matrix4d movement_transform) {
+  auto prev_depth_img = cv_bridge::toCvCopy(prev_img_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+  auto curr_depth_img = cv_bridge::toCvCopy(curr_img_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+  auto prev_img = cv_bridge::toCvCopy(prev_img_msg, sensor_msgs::image_encodings::BGR8);
+  auto curr_img = cv_bridge::toCvCopy(curr_img_msg, sensor_msgs::image_encodings::BGR8);
 
+  auto chessboard_1 = prev_img->image;
+  auto chessboard_2 = curr_img ->image;
 
-  // once both curr and prev frames are set then apply icp and find the transformation between the two frames
-  m_icp->compute(prev_ptr, curr_ptr);
+  auto detected_corners_prev_frame = find_corners(prev_img, prev_depth_img, cam_info_msg);
+  auto detected_corners_curr_frame = find_corners(curr_img, curr_depth_img, cam_info_msg);
 
-  auto transformation = m_icp->get_ICP_obj().getFinalTransformation();
+  if(detected_corners_curr_frame.size() == detected_corners_prev_frame.size()) {
+    auto error = 0.0;
+    for(unsigned int i = 0; i < detected_corners_curr_frame.size(); i ++) {
+      auto prev_corner = detected_corners_prev_frame[i];
+      auto curr_corner = detected_corners_curr_frame[i];
+      auto result_corner = movement_transform * prev_corner;
 
-  Eigen::Quaternionf q(transformation.block<3,3>(0,0));
-  geometry_msgs::TransformStamped movement;
-  movement.header = prev_cloud_msg->header;
+      // find euclidean distance
+      pcl::PointXYZ pt_2;
+      pt_2.x  = curr_corner.x();
+      pt_2.y  = curr_corner.y();
+      pt_2.z  = curr_corner.z();
+      pcl::PointXYZ pt_result;
+      pt_result.x  = result_corner.x();
+      pt_result.y  = result_corner.y();
+      pt_result.z  = result_corner.z();
+      auto distance = std::sqrt(std::pow(pt_2.x - pt_result.x, 2) + std::pow(pt_2.y - pt_result.y, 2) + std::pow(pt_2.z - pt_result.z, 2));
+//      std::cout << "Point " << i + 1 << std::endl;
+//      std::cout << "Selected point: " <<  pt_2 << std::endl;
+//      std::cout << "Transformed point: " << pt_result << std::endl;
+//      std::cout << "Distance: " << distance * 1000 << " mm" << std::endl;
 
-  movement.transform.translation.x = transformation(0, 3);
-  movement.transform.translation.y = transformation(1, 3);
-  movement.transform.translation.z = transformation(2, 3);
-  movement.transform.rotation.x = q.x();
-  movement.transform.rotation.y = q.y();
-  movement.transform.rotation.z = q.z();
-  movement.transform.rotation.w = q.w();
+      error += distance;
+    }
 
-  double x = movement.transform.translation.x;
-  double y = movement.transform.translation.y;
-  double z = movement.transform.translation.z;
+    /*cv::imshow("curr", chessboard_2);
+    cv::waitKey(0);
+    cv::destroyWindow("curr");*/
 
-  double qw = movement.transform.rotation.w;
-  double qx = movement.transform.rotation.x;
-  double qy = movement.transform.rotation.y;
-  double qz = movement.transform.rotation.z;
+    error /= detected_corners_curr_frame.size();
+    std::cout << "Error: " << error * 1000 << " mm" << std::endl;
 
-  Eigen::Matrix4d movement_transform;
-  movement_transform << 2 * (std::pow(qw, 2) + std::pow(qx, 2)) - 1, 2 * (qx*qy - qw*qz), 2 * (qx*qz + qw*qy), x,
-                                  2 * (qx*qy + qw*qz), 2 * (std::pow(qw, 2) + std::pow(qy, 2)) - 1, 2 * (qy*qz - qw*qx), y,
-                                  2 * (qx*qz - qw*qy), 2 * (qy*qz + qw*qx), 2 * (std::pow(qw, 2) + std::pow(qz, 2)) - 1, z,
-                                  0                                          , 0                   , 0                 , 1;
+  }
 
-  m_pub_transformation.publish(movement);
+}
 
-
+void calculate_error(const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg, Eigen::Matrix4d movement_transform) {
   float cx = static_cast<float>(cam_info_msg->K.at(2));
   float cy = static_cast<float>(cam_info_msg->K.at(5));
   float fx = static_cast<float>(cam_info_msg->K.at(0));
@@ -214,9 +260,103 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
     msg_3.header.frame_id = "rgb_camera_link";
     msg_3.header.stamp = ros::Time::now();
     m_pub_cloud_3.publish(msg_2);
-
-
   }
+}
+
+
+void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_msg, const sensor_msgs::PointCloud2ConstPtr& curr_cloud_msg, const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg){
+  PointCloudT::Ptr prev_ptr (new PointCloudT);
+  PointCloudT::Ptr curr_ptr (new PointCloudT);
+
+  pcl::fromROSMsg(*prev_cloud_msg, *prev_ptr);
+  pcl::fromROSMsg(*curr_cloud_msg, *curr_ptr);
+
+  // remove the plane from the point cloud
+
+  prev_ptr = Preprocessing::voxel_grid_downsampling(prev_ptr, 0.015f);
+  prev_ptr = Preprocessing::statistical_filtering(prev_ptr, 1.0);
+
+  curr_ptr = Preprocessing::voxel_grid_downsampling(curr_ptr, 0.015f);
+  curr_ptr = Preprocessing::statistical_filtering(curr_ptr, 1.0);
+
+
+  // move the previous cloud towards the current cloud, this may help the registration
+
+  /*PointT centroid_p;
+  pcl::computeCentroid(*prev_ptr, centroid_p);
+
+  PointT centroid_c;
+  pcl::computeCentroid(*curr_ptr, centroid_c);
+
+  PointT diff;
+  diff.x = centroid_c.x - centroid_p.x;
+  diff.y = centroid_c.y - centroid_p.y;
+  diff.z = centroid_c.z - centroid_p.z;
+
+  for (auto &point : prev_ptr->points) {
+    point.x = point.x + diff.x;
+    point.y = point.y + diff.y;
+    point.z = point.z + diff.z;
+  }*/
+
+  //prev_ptr = Preprocessing::extract_plane(prev_ptr, 0.010);
+  //curr_ptr = Preprocessing::extract_plane(curr_ptr, 0.010);
+
+  // move the curr position to the robot base
+  //pcl::transformPointCloud(*curr_ptr, *curr_ptr, transformation_to_robot_base);
+  // move the prev position to the robot base
+  //pcl::transformPointCloud(*prev_ptr, *prev_ptr, transformation_to_robot_base);
+
+
+
+  // once both curr and prev frames are set then apply icp and find the transformation between the two frames
+  m_icp->compute(prev_ptr, curr_ptr);
+
+  auto transformation = m_icp->get_ICP_obj().getFinalTransformation();
+
+  Eigen::Quaternionf q(transformation.block<3,3>(0,0));
+  geometry_msgs::TransformStamped movement;
+  movement.header = prev_cloud_msg->header;
+
+  movement.transform.translation.x = transformation(0, 3);
+  movement.transform.translation.y = transformation(1, 3);
+  movement.transform.translation.z = transformation(2, 3);
+  movement.transform.rotation.x = q.x();
+  movement.transform.rotation.y = q.y();
+  movement.transform.rotation.z = q.z();
+  movement.transform.rotation.w = q.w();
+
+  double x = movement.transform.translation.x;
+  double y = movement.transform.translation.y;
+  double z = movement.transform.translation.z;
+
+  double qw = movement.transform.rotation.w;
+  double qx = movement.transform.rotation.x;
+  double qy = movement.transform.rotation.y;
+  double qz = movement.transform.rotation.z;
+
+  Eigen::Matrix4d movement_transform;
+  movement_transform << 2 * (std::pow(qw, 2) + std::pow(qx, 2)) - 1, 2 * (qx*qy - qw*qz), 2 * (qx*qz + qw*qy), x,
+                                  2 * (qx*qy + qw*qz), 2 * (std::pow(qw, 2) + std::pow(qy, 2)) - 1, 2 * (qy*qz - qw*qx), y,
+                                  2 * (qx*qz - qw*qy), 2 * (qy*qz + qw*qx), 2 * (std::pow(qw, 2) + std::pow(qz, 2)) - 1, z,
+                                  0                                          , 0                   , 0                 , 1;
+
+  m_pub_transformation.publish(movement);
+
+  //calculate_error(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
+  calculate_error_using_chessboard_detection(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
+
+  sensor_msgs::PointCloud2 msg_start;
+  pcl::toROSMsg(*prev_ptr, msg_start);
+  msg_start.header.frame_id = "rgb_camera_link";
+  msg_start.header.stamp = ros::Time::now();
+  movement_start_pub.publish(msg_start);
+
+  sensor_msgs::PointCloud2 msg_stop;
+  pcl::toROSMsg(*curr_ptr, msg_stop);
+  msg_stop.header.frame_id = "rgb_camera_link";
+  msg_stop.header.stamp = ros::Time::now();
+  movement_end_pub.publish(msg_stop);
 
 }
 
@@ -254,6 +394,9 @@ int main(int argc, char** argv) {
   m_pub_cloud_1 = nh.advertise<sensor_msgs::PointCloud2>("/cloud_1", 1);
   m_pub_cloud_2 = nh.advertise<sensor_msgs::PointCloud2>("/cloud_2", 1);
   m_pub_cloud_3 = nh.advertise<sensor_msgs::PointCloud2>("/cloud_result", 1);
+
+  movement_start_pub = nh.advertise<sensor_msgs::PointCloud2>("/movement_start_plane_segmented", 1);
+  movement_end_pub = nh.advertise<sensor_msgs::PointCloud2>("/movement_end_plane_segmented", 1);
 
   prev_cloud_sub.subscribe(nh, "movement_start", 1);
   curr_cloud_sub.subscribe(nh, "movement_end", 1);
