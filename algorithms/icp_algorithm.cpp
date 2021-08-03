@@ -116,7 +116,7 @@ PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &ta
   // Set the maximum number of iterations
   // It is 10 by default
   //this->icp.setMaxCorrespondenceDistance (0.005);
-  this->icp.setMaximumIterations(500);
+  this->icp.setMaximumIterations(this->m_max_num_iter);
   //this->icp.setEuclideanFitnessEpsilon(1e-5);
 
   // Set convergence criteria
