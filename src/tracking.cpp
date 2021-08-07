@@ -1,7 +1,6 @@
 #include <iostream>
 #include <yaml-cpp/yaml.h>
 #include <ros/ros.h>
-#include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <image_transport/image_transport.h>
@@ -303,9 +302,9 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
   //curr_ptr = Preprocessing::extract_plane(curr_ptr, 0.010);
 
   // move the curr position to the robot base
-  //pcl::transformPointCloud(*curr_ptr, *curr_ptr, transformation_to_robot_base);
+  pcl::transformPointCloud(*curr_ptr, *curr_ptr, transformation_to_robot_base);
   // move the prev position to the robot base
-  //pcl::transformPointCloud(*prev_ptr, *prev_ptr, transformation_to_robot_base);
+  pcl::transformPointCloud(*prev_ptr, *prev_ptr, transformation_to_robot_base);
 
 
 
@@ -344,7 +343,7 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
   m_pub_transformation.publish(movement);
 
   //calculate_error(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
-  calculate_error_using_chessboard_detection(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
+  //calculate_error_using_chessboard_detection(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
 
   sensor_msgs::PointCloud2 msg_start;
   pcl::toROSMsg(*prev_ptr, msg_start);

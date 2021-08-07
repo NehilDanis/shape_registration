@@ -22,7 +22,7 @@ from PyQt5.QtCore import *
 button_pressed = False
 
 
-class Window(QMainWindow):
+'''class Window(QMainWindow):
     def __init__(self):
         super(QMainWindow, self).__init__()
 
@@ -65,7 +65,7 @@ class Window(QMainWindow):
     def clickme(self):
         global button_pressed
         button_pressed = True
-        print("pressed")
+        print("pressed")'''
 
 class MovementDetector():
     def __init__(self):
@@ -75,6 +75,7 @@ class MovementDetector():
         self.image_sub = message_filters.Subscriber("img", Image)
         self.depth_sub = message_filters.Subscriber("depth_img", Image)
         self.cam_info_sub = message_filters.Subscriber("cam_info", CameraInfo)
+        self.sub_button_pressed = rospy.Subscriber("button_pressed_from_app", Bool, self.button_pressed_from_app)
 
         self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.cam_info_sub, self.mask_sub], 10, 0.1, allow_headerless=True)
         self.ts.registerCallback(self.callback)
@@ -105,6 +106,11 @@ class MovementDetector():
         self.end_img_depth = None
         self.msg_count = 0
         self.robot_stop = False
+
+    def button_pressed_from_app(self, msg):
+        global button_pressed
+        print("button_pressed is true")
+        button_pressed = True
 
     def dice_score(self, prev_mask, curr_mask):
         temp = np.ones(curr_mask.shape)
@@ -221,12 +227,12 @@ def main(args):
     rospy.init_node('MovementDetectorNode', anonymous=True)
     pp = MovementDetector()
     # create pyqt5 app
-    App = QApplication(sys.argv)
+    #App = QApplication(sys.argv)
 
     # create the instance of our Window
-    window = Window()
+    #window = Window()
 
-    sys.exit(App.exec_())
+    #sys.exit(App.exec_())
 
     try:
         rospy.spin()
