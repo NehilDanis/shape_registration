@@ -107,31 +107,79 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
    this->m_target_non_keypoints = target_non_keypoints;
 }
 
+void ICPAlgorithm::find_initial_transform_for_small_sets(PointCloudT::Ptr &source_cloud, PointCloudT::Ptr &target_cloud) {
+  pcl::CorrespondencesPtr correspondences(new pcl::Correspondences);
+  correspondences->resize(source_cloud->points.size());
+
+  // Here we manually defined the correspondences!
+  for(unsigned int i = 0; i < source_cloud->points.size(); i++) {
+    pcl::Correspondence corr;
+    corr.index_query = i;
+    corr.index_match = i;
+    corr.distance = 0;
+    (*correspondences)[i] = corr;
+  }
+
+  pcl::registration::TransformationEstimationSVD<PointT,PointT> transformation_est_SVD;
+  transformation_est_SVD.estimateRigidTransformation(*source_cloud, *target_cloud, *correspondences, this->transformation);
+}
+
 PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
 
   // Set the input source and input target point clouds to the icp algorithm.
+
   this->icp.setInputSource(source);
   this->icp.setInputTarget(target);
 
+ PointCloudT final_cloud;
+
   // Set the maximum number of iterations
   // It is 10 by default
-  //this->icp.setMaxCorrespondenceDistance (0.005);
-  this->icp.setMaximumIterations(this->m_max_num_iter);
-  //this->icp.setEuclideanFitnessEpsilon(1e-5);
-
+  //this->icp.setMaxCorrespondenceDistance (0.1);
+//  this->icp.setMaximumIterations(this->m_max_num_iter);
+ this->icp.setMaximumIterations(this->m_max_num_iter);
+  //this->icp.setEuclideanFitnessEpsilon(1e-8);
   // Set convergence criteria
   //this->icp.setTransformationEpsilon (1e-8);
 
   // Create a new point cloud which will represent the result point cloud after
   // iteratively applying transformations to the input source cloud, to make it
   // look like the target point cloud.
-  PointCloudT final_cloud;
+//  PointCloudT final_cloud;
+
   this->icp.align(final_cloud);
+//  this->icp.setMaximumIterations(1500);
 
   // Print whether the icp algorithm has converged to the same result with the
   // target, and the resulting rigid body transformation details.
   ROS_INFO("has converged : %d", this->icp.hasConverged());
   ROS_INFO("score : %f", this->icp.getFitnessScore());
+
+  if(this->icp.hasConverged() && this->icp.getFitnessScore() < 0.0003) {
+    return final_cloud;
+  }
+  final_cloud.clear();
+  return final_cloud;
+
+}
+
+PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target, Eigen::Matrix4f init_transform) {
+
+  // Set the input source and input target point clouds to the icp algorithm.
+
+  this->icp.setInputSource(source);
+  this->icp.setInputTarget(target);
+
+ PointCloudT final_cloud;
+
+ this->icp.setMaximumIterations(this->m_max_num_iter);
+
+  this->icp.align(final_cloud, init_transform);
+  // Print whether the icp algorithm has converged to the same result with the
+  // target, and the resulting rigid body transformation details.
+  ROS_INFO("has converged : %d", this->icp.hasConverged());
+  ROS_INFO("score : %f", this->icp.getFitnessScore());
+
 
   if(this->icp.hasConverged() && this->icp.getFitnessScore() < 0.0003) {
     return final_cloud;

@@ -30,6 +30,7 @@ public:
 
   ICPAlgorithm(int max_num_iter);
   PointCloudT compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
+  PointCloudT compute(PointCloudT::Ptr &source, PointCloudT::Ptr &target, Eigen::Matrix4f transformation);
   //Matrix get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
   void get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target);
   inline pcl::IterativeClosestPoint<PointT, PointT> get_ICP_obj() {return this->icp;}
@@ -37,6 +38,7 @@ public:
   inline PointCloudT::Ptr get_target_keypoints() { return this->m_target_keypoints; }
   inline PointCloudT::Ptr get_source_non_keypoints() { return this->m_source_non_keypoints; }
   inline PointCloudT::Ptr get_target_non_keypoints() { return this->m_target_non_keypoints; }
+  void find_initial_transform_for_small_sets(PointCloudT::Ptr &source_cloud, PointCloudT::Ptr &target_cloud);
 
 public:
   pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;

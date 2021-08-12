@@ -92,6 +92,8 @@ add_executable(transformation_checker_node utils/check_transformation.cpp)
 
 add_executable(test_depth_vals_node utils/test_depth_vals.cpp)
 
+add_executable(hand_eye_manual_calibration utils/hand_eye_calibration.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
+
 
 
 target_link_libraries(test_depth_vals_node
@@ -199,5 +201,14 @@ target_link_libraries(test_icp
    ${OpenCV_LIBRARIES}
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
+ )
+
+target_include_directories(hand_eye_manual_calibration PRIVATE ${YAML_CPP_INCLUDE_DIR})
+message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
+target_link_libraries(hand_eye_manual_calibration
+   ${OpenCV_LIBS}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
  )
 
