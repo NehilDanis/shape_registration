@@ -143,37 +143,72 @@ void calculate_error_using_chessboard_detection(const sensor_msgs::ImageConstPtr
   auto detected_corners_prev_frame = find_corners(prev_img, prev_depth_img, cam_info_msg);
   auto detected_corners_curr_frame = find_corners(curr_img, curr_depth_img, cam_info_msg);
 
+  PointCloudT::Ptr checkerboard_1 (new PointCloudT);
+  PointCloudT::Ptr checkerboard_2 (new PointCloudT);
+  PointCloudT::Ptr transformed_cloud (new PointCloudT);
+
+
   if(detected_corners_curr_frame.size() == detected_corners_prev_frame.size()) {
     auto error = 0.0;
-    for(unsigned int i = 0; i < detected_corners_curr_frame.size(); i ++) {
+
+    for (unsigned int i = 0; i < detected_corners_curr_frame.size(); i++) {
       auto prev_corner = detected_corners_prev_frame[i];
       auto curr_corner = detected_corners_curr_frame[i];
-      auto result_corner = movement_transform * prev_corner;
+      pcl::PointXYZ prev_p;
+      prev_p.x  = prev_corner.x();
+      prev_p.y  = prev_corner.y();
+      prev_p.z  = prev_corner.z();
+      pcl::PointXYZ curr_p;
+      curr_p.x  = curr_corner.x();
+      curr_p.y  = curr_corner.y();
+      curr_p.z  = curr_corner.z();
+      checkerboard_1->points.push_back(prev_p);
+      checkerboard_2->points.push_back(curr_p);
+    }
+
+    //move checkerboard points to the robot base.
+    pcl::transformPointCloud(*checkerboard_1, *checkerboard_1, transformation_to_robot_base);
+    pcl::transformPointCloud(*checkerboard_2, *checkerboard_2, transformation_to_robot_base);
+
+    pcl::transformPointCloud(*checkerboard_1, *transformed_cloud, movement_transform);
+
+    checkerboard_1->width = checkerboard_2->width = transformed_cloud->width = detected_corners_curr_frame.size();
+    checkerboard_1->height = checkerboard_2->height = transformed_cloud->height = 1;
+
+    for(unsigned int i = 0; i < checkerboard_1->points.size(); i ++) {
 
       // find euclidean distance
-      pcl::PointXYZ pt_2;
-      pt_2.x  = curr_corner.x();
-      pt_2.y  = curr_corner.y();
-      pt_2.z  = curr_corner.z();
-      pcl::PointXYZ pt_result;
-      pt_result.x  = result_corner.x();
-      pt_result.y  = result_corner.y();
-      pt_result.z  = result_corner.z();
+      pcl::PointXYZ pt_2 = checkerboard_2->points[i];
+      pcl::PointXYZ pt_result = transformed_cloud->points[i];
       auto distance = std::sqrt(std::pow(pt_2.x - pt_result.x, 2) + std::pow(pt_2.y - pt_result.y, 2) + std::pow(pt_2.z - pt_result.z, 2));
-//      std::cout << "Point " << i + 1 << std::endl;
-//      std::cout << "Selected point: " <<  pt_2 << std::endl;
-//      std::cout << "Transformed point: " << pt_result << std::endl;
-//      std::cout << "Distance: " << distance * 1000 << " mm" << std::endl;
+      std::cout << "Point " << i + 1 << std::endl;
+      std::cout << "Selected point: " <<  pt_2 << std::endl;
+      std::cout << "Transformed point: " << pt_result << std::endl;
+      std::cout << "Distance: " << distance * 1000 << " mm" << std::endl;
 
       error += distance;
     }
 
-    /*cv::imshow("curr", chessboard_2);
-    cv::waitKey(0);
-    cv::destroyWindow("curr");*/
-
-    error /= detected_corners_curr_frame.size();
+    error /= checkerboard_1->points.size();
     std::cout << "Error: " << error * 1000 << " mm" << std::endl;
+
+    sensor_msgs::PointCloud2 msg_1;
+    pcl::toROSMsg(*checkerboard_1, msg_1);
+    msg_1.header.frame_id = "rgb_camera_link";
+    msg_1.header.stamp = ros::Time::now();
+    m_pub_cloud_1.publish(msg_1);
+
+    sensor_msgs::PointCloud2 msg_2;
+    pcl::toROSMsg(*checkerboard_2, msg_2);
+    msg_2.header.frame_id = "rgb_camera_link";
+    msg_2.header.stamp = ros::Time::now();
+    m_pub_cloud_2.publish(msg_2);
+
+    sensor_msgs::PointCloud2 msg_3;
+    pcl::toROSMsg(*transformed_cloud, msg_3);
+    msg_2.header.frame_id = "rgb_camera_link";
+    msg_2.header.stamp = ros::Time::now();
+    m_pub_cloud_3.publish(msg_3);
 
   }
 
@@ -340,6 +375,7 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
                                   2 * (qx*qz - qw*qy), 2 * (qy*qz + qw*qx), 2 * (std::pow(qw, 2) + std::pow(qz, 2)) - 1, z,
                                   0                                          , 0                   , 0                 , 1;
 
+  std::cout << "movement: " << movement_transform << std::endl;
   m_pub_transformation.publish(movement);
 
   //calculate_error(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
