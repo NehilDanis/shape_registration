@@ -49,6 +49,60 @@ const std::string EE_LINK = "iiwa_link_ee";
 using PointT = pcl::PointXYZ;
 using PointCloudT = pcl::PointCloud<PointT>;
 
+void optimize_normals(PointCloudT::Ptr &trajectory, pcl::PointCloud<pcl::Normal>::Ptr &trajectory_normals) {
+  Eigen::Vector3f gt_normal(0, 0, -1);
+  for(unsigned int i = 0; i < trajectory->size(); i++) {
+    // go thru the elements in the trajectory and optimize the normals by looking at the previous and current normal
+    auto normal = trajectory_normals->points[i].getNormalVector3fMap();
+    if(normal[2] > 0) {
+      normal[0] *= -1;
+      normal[1] *= -1;
+      normal[2] *= -1;
+    }
+
+
+    // look at the normals around it
+    unsigned int first_point;
+    unsigned int second_point;
+    if(i == trajectory->size() - 1) {
+      first_point = i - 2;
+      second_point = i - 1;
+    }
+    else if (i == 0) {
+      first_point = i + 1;
+      second_point = i + 2;
+    }
+    else {
+      first_point = i - 1;
+      second_point = i + 1;
+    }
+
+    auto first_normal = trajectory_normals->points[first_point].getNormalVector3fMap();
+    auto second_normal = trajectory_normals->points[second_point].getNormalVector3fMap();
+    auto curr_normal = trajectory_normals->points[i].getNormalVector3fMap();
+    auto cos_theta = first_normal.dot(curr_normal) /
+        (first_normal.norm() * curr_normal.norm());
+    auto theta_between_first_curr =  acos(cos_theta) * 180.0 / M_PI;
+
+    cos_theta = first_normal.dot(second_normal) /
+        (first_normal.norm() * second_normal.norm());
+    auto theta_between_first_second =  acos(cos_theta) * 180.0 / M_PI;
+
+    if(theta_between_first_curr > 10.0) {
+      // then first and curr has a large difference
+      if(theta_between_first_second < 10.0) {
+        std::cout << "heyy" << std::endl;
+        // then the curr point has an issue, lets change its normal
+        trajectory_normals->points[i]._Normal::normal_x = (first_normal.x() + second_normal.x()) / 2;
+        trajectory_normals->points[i]._Normal::normal_y = (first_normal.x() + second_normal.y()) / 2;
+        trajectory_normals->points[i]._Normal::normal_z = (first_normal.x() + second_normal.z()) / 2;
+      }
+
+    }
+
+  }
+}
+
 Eigen::Quaternionf get_rotation(Eigen::Vector3f x, Eigen::Vector3f z){
   //std::cout << "x: " << std::endl;
   //std::cout << "z: " << std::endl;
@@ -78,7 +132,7 @@ Eigen::Quaternionf get_rotation(Eigen::Vector3f x, Eigen::Vector3f z){
   return q.normalized();
 }
 
-PointCloudT project_trajectory_onto_surface_method2(const PointCloudT::Ptr &trajectory, const PointCloudT::Ptr & arm_cloud){
+PointCloudT project_trajectory_onto_surface_method2(const PointCloudT::Ptr &trajectory, const PointCloudT::Ptr & arm_cloud, const pcl::PointCloud<pcl::Normal>::Ptr &trajectory_normals, pcl::PointCloud<pcl::Normal>::Ptr &new_normals){
   // if two points in the trajectory are on almost the same direction, then we don't need to add all the points
 
   PointCloudT new_trajectory;
@@ -88,32 +142,43 @@ PointCloudT project_trajectory_onto_surface_method2(const PointCloudT::Ptr &traj
   bool defined_prev_dir = false;
   for(size_t i = 0; i < trajectory->points.size() - 1; i ++) {
     auto curr_point = trajectory->points[i];
+    auto curr_normal = trajectory_normals->points[i];
     auto next_point = trajectory->points[i + 1];
     curr_direction = next_point.getArray3fMap() - curr_point.getArray3fMap();
     if(!defined_prev_dir) {
       // add the first point of the trajectory
       prev_direction = curr_direction;
       new_trajectory.points.push_back(curr_point);
+      new_normals->points.push_back(curr_normal);
       defined_prev_dir = true;
     }
     else{
       auto cos_theta = curr_direction.dot(prev_direction) /
           (curr_direction.norm() * prev_direction.norm());
       auto theta =  acos(cos_theta) * 180.0 / M_PI;
-      if(theta > 10 && theta < 90) {
+      if(theta > 30 && theta <= 40) {
         // add the curr point to the trajectory
         new_trajectory.points.push_back(curr_point);
+        new_normals->points.push_back(curr_normal);
       }
     }
   }
 
   // add the last point of the trajectory
   new_trajectory.points.push_back(trajectory->points[trajectory->points.size()-1]);
-
+  new_normals->points.push_back(trajectory_normals->points[trajectory_normals->points.size() - 1]);
+  new_normals->height = 1;
+  new_normals->width = new_normals->points.size();
   return new_trajectory;
 }
 
 
+/**
+ * @brief find_trajectory_from_p_cloud in this function, the trajectory is created from the point cloud of the artery.
+ * @param artery_cloud artery to create the trajectory from
+ * @param transformed_cloud generated trajectory will be written here
+ * @return
+ */
 PointCloudT find_trajectory_from_p_cloud(const PointCloudT::Ptr &artery_cloud, PointCloudT::Ptr &transformed_cloud){
 
   /**
@@ -155,7 +220,7 @@ PointCloudT find_trajectory_from_p_cloud(const PointCloudT::Ptr &artery_cloud, P
    auto result_cloud = std::make_shared<pcl::PointCloud<pcl::PointXYZ>>();
 
    // every 2 cm we look for the knn to find the point
-   for(float start = min_p.x; start < max_p.x; start += 0.02) {
+   for(float start = min_p.x; start < max_p.x; start += 0.02f) {
 
      pcl::PointXYZ searchPoint;
 
@@ -219,12 +284,6 @@ PointCloudT find_trajectory_from_p_cloud(const PointCloudT::Ptr &artery_cloud, P
 
 int main(int argc, char **argv)
 {
-//  ros::init(argc, argv, "robot_controller");
-//  ros::NodeHandle nh;
-
-//  ros::Publisher pub_desiredPose_;
-//  pub_desiredPose_ = nh.advertise<geometry_msgs::PoseStamped>("/iiwa/command/CartesianPose",10);
-
   /**
     READ THE ARM AND ARTERY POINT CLOUDS
    **/
@@ -246,15 +305,11 @@ int main(int argc, char **argv)
     PCL_ERROR ("Couldn't read file\n");
   }
 
-//  if (pcl::io::loadPCDFile<PointT> ("/home/nehil/catkin_ws_registration/src/artery_downsampled_camera_base.pcd", *artery_cloud_cam_base) == -1) //* load the arm
-//  {
-//    PCL_ERROR ("Couldn't read file\n");
-//  }
-
   if (pcl::io::loadPCDFile<PointT> ("/home/nehil/catkin_ws_registration/src/ct_in_robot_base.pcd", *ct_in_robot_base) == -1) //* load the arm
   {
     PCL_ERROR ("Couldn't read file\n");
   }
+
   if (pcl::io::loadPCDFile<PointT> ("/home/nehil/catkin_ws_registration/src/trajectory_projected_new.pcd", *projected_trajectory_new) == -1) //* load the arm
   {
     PCL_ERROR ("Couldn't read file\n");
@@ -266,6 +321,10 @@ int main(int argc, char **argv)
    **/
 
    auto trajectory = std::make_shared<PointCloudT>(find_trajectory_from_p_cloud(artery_cloud, transformed_cloud));
+
+//   for(const auto &point : *trajectory) {
+//     std::cout << point << std::endl;
+//   }
 
    /**
      PROJECT THE TRAJECTORY TO THE ARM SURFACE AND RECOVER THE NORMAL DIRECTIONS TO DECIDE THE ORIENTATION OF THE PROBE
@@ -296,11 +355,11 @@ int main(int argc, char **argv)
    std::vector<float> pointKNNSquaredDistance_1(K_1);
 
    size_t num_neighbors_1 = kdtree_n.nearestKSearch (first_point, K_1, pointIdxKNNSearch_1, pointKNNSquaredDistance_1);
-   //max_z = (*arm_cloud)[ std::size_t(pointIdxKNNSearch_1[0])].z;
+   max_z = (*arm_cloud)[ std::size_t(pointIdxKNNSearch_1[0])].z;
 
    for(const auto &point : *trajectory) {
      PointT searchPoint;
-     int K = 2;
+     int K = 5;
      searchPoint.x = point.x;
      searchPoint.y = point.y;
      searchPoint.z = max_z;
@@ -312,32 +371,58 @@ int main(int argc, char **argv)
 
      if ( num_neighbors > 0 )
      {
-
+       auto avg_depth = 0.0f;
        for(int ind : pointIdxKNNSearch) {
-         if(trajectory_projected->points.empty()) {
-           (*arm_cloud)[ std::size_t(ind) ].x = searchPoint.x;
-           (*arm_cloud)[ std::size_t(ind) ].y = searchPoint.y;
-           trajectory_projected->points.push_back((*arm_cloud)[ std::size_t(ind) ]);
-           indices_to_extract->push_back(ind);
-           prev_point = (*arm_cloud)[ std::size_t(ind) ];
-           break;
-         }
-         else{
-           const auto &curr_point = (*arm_cloud)[ std::size_t(ind) ];
-           if(std::abs(prev_point.x - curr_point.x) > 1e-4f && std::abs(prev_point.y - curr_point.y) > 1e-4f && std::abs(prev_point.z - curr_point.z) > 1e-4f) {
-             (*arm_cloud)[ std::size_t(ind) ].x = searchPoint.x;
-             (*arm_cloud)[ std::size_t(ind) ].y = searchPoint.y;
-             trajectory_projected->points.push_back((*arm_cloud)[ std::size_t(ind) ]);
-             indices_to_extract->push_back(ind);
-             prev_point = (*arm_cloud)[ std::size_t(ind) ];
-             break;
-           }
+         avg_depth += (*arm_cloud)[ std::size_t(ind)].z;
+       }
+       avg_depth /= num_neighbors;
+       auto inner_circle_avg_depth = 0.0f;
+       auto variance = 0.002f;
+       unsigned int inner_circle_count = 0;
+       for(int ind : pointIdxKNNSearch) {
+         if(std::abs((*arm_cloud)[ std::size_t(ind)].z - avg_depth) < variance) {
+           inner_circle_avg_depth += (*arm_cloud)[ std::size_t(ind)].z;
+           inner_circle_count += 1;
          }
        }
+       if(inner_circle_count == 0) {
+         inner_circle_avg_depth = avg_depth;
+       }
+       else{
+         inner_circle_avg_depth /= inner_circle_count;
+       }
+       PointT new_point;
+       (*arm_cloud)[ std::size_t(0) ].x = searchPoint.x;
+       (*arm_cloud)[ std::size_t(0) ].y = searchPoint.y;
+       (*arm_cloud)[ std::size_t(0) ].z = inner_circle_avg_depth;
+       trajectory_projected->points.push_back((*arm_cloud)[ std::size_t(0)]);
+
+//       for(int ind : pointIdxKNNSearch) {
+//         if(trajectory_projected->points.empty()) {
+//           (*arm_cloud)[ std::size_t(ind) ].x = searchPoint.x;
+//           (*arm_cloud)[ std::size_t(ind) ].y = searchPoint.y;
+//           trajectory_projected->points.push_back((*arm_cloud)[ std::size_t(ind) ]);
+//           indices_to_extract->push_back(ind);
+//           prev_point = (*arm_cloud)[ std::size_t(ind) ];
+//           break;
+//         }
+//         else{
+//           auto curr_point = (*arm_cloud)[ std::size_t(ind) ];
+//           curr_point.x = searchPoint.x;
+//           curr_point.y = searchPoint.y;
+
+//           if(std::abs(prev_point.x - curr_point.x) > 1e-4f && std::abs(prev_point.y - curr_point.y) > 1e-4f && std::abs(prev_point.z - curr_point.z) > 1e-4f) {
+//             (*arm_cloud)[ std::size_t(ind) ].x = searchPoint.x;
+//             (*arm_cloud)[ std::size_t(ind) ].y = searchPoint.y;
+//             trajectory_projected->points.push_back((*arm_cloud)[ std::size_t(ind) ]);
+//             indices_to_extract->push_back(ind);
+//             prev_point = (*arm_cloud)[ std::size_t(ind) ];
+//             break;
+//           }
+//         }
+//       }
      }
    }
-
-   trajectory_projected = std::make_shared<PointCloudT>(project_trajectory_onto_surface_method2(trajectory_projected, arm_cloud));
 
 
    /**
@@ -362,7 +447,7 @@ int main(int argc, char **argv)
 
    // Use all neighbors in a sphere of radius 2cm
    // TODO can be also 3 cm
-   ne.setRadiusSearch (0.02);
+   ne.setRadiusSearch (0.03);
 
    // Compute the features
    ne.compute (*trajectory_normals);
@@ -370,14 +455,15 @@ int main(int argc, char **argv)
    std::cout << trajectory_projected->points.size() << std::endl;
    std::cout << trajectory_normals->points.size() << std::endl;
 
-//   for (auto &normal : trajectory_normals->points) {
-//     if(normal._Normal::normal_z > 0) {
-//       normal._Normal::normal_z = - normal._Normal::normal_z;
-//       normal._Normal::normal_x = - normal._Normal::normal_x;
-//       normal._Normal::normal_y = - normal._Normal::normal_y;
-//       std::cout << normal._Normal::normal_x << " " << normal._Normal::normal_y << " " <<  normal._Normal::normal_z << " " << std::endl;
-//     }
-//   }
+   optimize_normals(trajectory_projected, trajectory_normals);
+
+//   pcl::PointCloud<pcl::Normal>::Ptr new_normals (new pcl::PointCloud<pcl::Normal>);
+
+//   trajectory_projected = std::make_shared<PointCloudT>(project_trajectory_onto_surface_method2(trajectory_projected, arm_cloud, trajectory_normals, new_normals));
+//   trajectory_normals = new_normals;
+
+   std::cout << trajectory_projected->points.size() << std::endl;
+   std::cout << trajectory_normals->points.size() << std::endl;
 
    // visualize normals
    pcl::visualization::PCLVisualizer viewer("PCL Viewer");
@@ -385,6 +471,7 @@ int main(int argc, char **argv)
    viewer.addPointCloud(arm_cloud, "trajectory_cloud");
    viewer.addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(trajectory_projected, trajectory_normals, 1, 0.02f, "normals");
    viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 1.0, "normals");
+
 
 
    while (!viewer.wasStopped ())
@@ -414,17 +501,6 @@ int main(int argc, char **argv)
      Eigen::Vector3f direction = curr_point.getArray3fMap() - prev_point.getArray3fMap();
      Eigen::Quaternionf q = get_rotation(direction, trajectory_normals->points[i].getNormalVector3fMap());
      myfile << prev_point.x << " " << prev_point.y << " " << prev_point.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
-     /*std::cout << "Direction" << std::endl;
-     std::cout << direction << std::endl;
-     if(direction[1] > 0) {
-       std::cout << "Normal : " << std::endl;
-       std::cout << trajectory_normals->points[i].getNormalVector3fMap() << std::endl;
-       Eigen::Quaternionf q = get_rotation(direction, trajectory_normals->points[i].getNormalVector3fMap());
-       myfile << prev_point.x << " " << prev_point.y << " " << prev_point.z << " " << q.x() << " " << q.y() << " " << q.z() << " " << q.w() << "\n";
-     }
-     else{
-       std::cout << "GOING WRONG DIRECTION" <<std::endl;
-     }*/
    }
 
    myfile.close();
