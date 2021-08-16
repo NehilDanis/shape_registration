@@ -66,6 +66,8 @@ catkin_install_python(PROGRAMS scripts/publisher_pyro.py scripts/image_saver.py 
 
 add_executable(calibration_checker_node utils/calibration_checker_node.cpp)
 
+add_executable(aruco_checker_node utils/aruco_checker_node.cpp)
+
 add_executable(ROI_cropping_node utils/crop_roi.cpp)
 
 add_executable(test_depth_projection_node utils/test_depth_projection.cpp)
@@ -94,7 +96,7 @@ add_executable(test_depth_vals_node utils/test_depth_vals.cpp)
 
 add_executable(hand_eye_manual_calibration utils/hand_eye_calibration.cpp algorithms/icp_algorithm.cpp utils/preprocessing.cpp)
 
-
+add_executable(test_checker_board_node utils/test_checker_board.cpp)
 
 target_link_libraries(test_depth_vals_node
    ${OpenCV_LIBRARIES}
@@ -112,6 +114,13 @@ target_link_libraries(calibration_checker_node
    ${PCL_LIBRARIES}
    ${YAML_CPP_LIBRARIES}
  )
+
+target_link_libraries(aruco_checker_node
+   ${OpenCV_LIBRARIES}
+   ${catkin_LIBRARIES}
+   ${PCL_LIBRARIES}
+ )
+
 
 target_include_directories(transformation_checker_node PRIVATE ${YAML_CPP_INCLUDE_DIR})
 message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")
@@ -202,6 +211,7 @@ target_link_libraries(test_icp
    ${catkin_LIBRARIES}
    ${PCL_LIBRARIES}
  )
+
 
 target_include_directories(hand_eye_manual_calibration PRIVATE ${YAML_CPP_INCLUDE_DIR})
 message(STATUS "YAML-CPP INCLUDE DIR: ${YAML_CPP_INCLUDE_DIR}")

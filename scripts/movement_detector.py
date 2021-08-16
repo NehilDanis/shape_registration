@@ -7,6 +7,7 @@ from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 import std_msgs.msg
 from std_msgs.msg import Bool
 import sensor_msgs.point_cloud2 as pcl2
+import time
 
 import message_filters
 import cv2
@@ -161,6 +162,8 @@ class MovementDetector():
         cv2.waitKey(1)'''
 
     def callback(self, img_msg, depth_msg, cam_info_msg, mask_msg):
+#        print("ros topic subscribe time : ")
+#        print(rospy.Time.now().secs - cam_info_msg.header.stamp.secs)
         global button_pressed
         mask = self.bridge.imgmsg_to_cv2(mask_msg, "mono8")
         img = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
@@ -169,18 +172,33 @@ class MovementDetector():
         if self.prev_mask is not None:
             if not self.robot_stop:
                 # if the robot is not stopped then check for the motion
-
-                if(self.dice_score(self.prev_mask, mask) < 0.95):
+                before_dice_calc = time.time()
+                dice_value = self.dice_score(self.prev_mask, mask)
+                after_dice_calc = time.time()
+#                print("dice score calc takes : ")
+#                print(after_dice_calc - before_dice_calc)
+#                print("dice value")
+#                print(dice_value)
+                if(dice_value < 0.95):
                     # movement occured
                     print("stop robot")
+                    start_msg_sent = time.time()
                     self.robot_stop = True
-                    self.start_img = self.last_stable_img
-                    self.start_img_depth = self.last_stable_depth
-                    self.prev_pointcloud_msg = self.create_pointcloud(self.last_stable_img, self.last_stable_depth, cam_info_msg, self.last_stable_mask)
-
                     movement_detected_msg = Bool()
                     movement_detected_msg.data = True
                     self.movement_detected_pub.publish(movement_detected_msg)
+                    end_msg_sent = time.time()
+                    #print("point cloud gen time : ")
+                    #print(end_msg_sent - start_msg_sent)
+
+                    self.start_img = self.last_stable_img
+                    self.start_img_depth = self.last_stable_depth
+                    start_pt_cloud_gen = time.time()
+                    self.prev_pointcloud_msg = self.create_pointcloud(self.last_stable_img, self.last_stable_depth, cam_info_msg, self.last_stable_mask)
+                    end_pt_cloud_gen = time.time()
+                    #print("point cloud gen time : ")
+                    #print(end_pt_cloud_gen - start_pt_cloud_gen)
+
 
             elif self.robot_stop and button_pressed:
                 # if the robot is stopped and the button to restart it is pressed then, this if statement
@@ -227,12 +245,12 @@ def main(args):
     rospy.init_node('MovementDetectorNode', anonymous=True)
     pp = MovementDetector()
     # create pyqt5 app
-    #App = QApplication(sys.argv)
+#    App = QApplication(sys.argv)
 
-    # create the instance of our Window
-    #window = Window()
+#    # create the instance of our Window
+#    window = Window()
 
-    #sys.exit(App.exec_())
+#    sys.exit(App.exec_())
 
     try:
         rospy.spin()

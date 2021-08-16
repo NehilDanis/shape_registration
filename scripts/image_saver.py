@@ -8,17 +8,20 @@ import os
 from cv_bridge import CvBridge, CvBridgeError
 
 # train path
-path = "/home/nehil/train_set_4"
+path = "/home/nehil/images_arm"
 
 class ImageSaver():
     def __init__(self):
         self.set_id = 1
         self.num_img = 1
-        self.count = 1
+        self.count = 157
         self.bridge = CvBridge()
         self.sub = rospy.Subscriber("/k4a/rgb/image_rect_color", Image, self.callback)
+        self.rate = rospy.Rate(0.5) # 1 Hz
+        # Do stuff, maybe in a while loop
 
     def callback(self, img_msg):
+        self.rate.sleep() # Sleeps for 1/rate sec
         '''if self.num_img <= 32:
             try:
               cv_image = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
@@ -59,8 +62,9 @@ class ImageSaver():
         self.count += 1
 
 def main(args):
-    pp = ImageSaver()
     rospy.init_node('ImageSaverNode', anonymous=True)
+    pp = ImageSaver()
+
     try:
         rospy.spin()
     except KeyboardInterrupt:

@@ -8,6 +8,7 @@ import Pyro5
 import message_filters
 import Pyro5.api
 import numpy as np
+import time
 #from cv_bridge import CvBridge, CvBridgeError
 
 import msgpack
@@ -41,7 +42,13 @@ class PublisherPyro(object):
         img = np.frombuffer(img_msg.data, dtype=np.uint8).reshape((img_msg.height, img_msg.width, -1))
         #img = np.ones((200, 200))
         #img[:,:50] = np.zeros((200, 50))
+        start_sending_time = time.time()
+#        print("hello")
         mask = self.pyro_server.segment_arm(img.copy())
+#        print("world")
+        end_sending_time = time.time()
+#        print("sending the image and receiving back the mask time : ")
+#        print(end_sending_time - start_sending_time)
 
         # the calculated mask using the segmentation network is published to the mask topic
         msg = Image()
