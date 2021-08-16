@@ -24,6 +24,7 @@
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/aruco.hpp>
 
 /*******************************************************************
 * SENSOR_FUSION INCLUDES
@@ -129,6 +130,117 @@ std::vector<Eigen::Vector4d> find_corners(cv_bridge::CvImageConstPtr cv_ptr_colo
   cv::waitKey(0);
   cv::destroyWindow("Extractcorner");
   return detected_corners;
+}
+
+std::vector<Eigen::Vector4d> find_aruco_corners(cv_bridge::CvImageConstPtr cv_ptr_color, cv_bridge::CvImageConstPtr cv_ptr_depth, const sensor_msgs::CameraInfoConstPtr& cam_info_msg) {
+  float cx = static_cast<float>(cam_info_msg->K.at(2));
+  float cy = static_cast<float>(cam_info_msg->K.at(5));
+  float fx = static_cast<float>(cam_info_msg->K.at(0));
+  float fy = static_cast<float>(cam_info_msg->K.at(4));
+
+  cv::Mat imageGray;
+  cv::cvtColor(cv_ptr_color->image, imageGray, CV_RGB2GRAY);
+  std::vector<Eigen::Vector4d> detected_corners;
+  cv::Ptr<cv::aruco::Dictionary> dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_ARUCO_ORIGINAL);
+  std::vector<int> ids;
+  std::vector<std::vector<cv::Point2f> > corners;
+  cv::aruco::detectMarkers(imageGray, dictionary, corners, ids);
+  // if at least one marker detected
+  if (ids.size() > 0) {
+      for (unsigned int i = 0; i < corners.size(); i++) {
+        if(ids[i] == 584){
+          for (unsigned int j = 0; j < corners[i].size(); j++) {
+            auto depth = cv_ptr_depth->image.at<float>(static_cast<int>(corners[i][j].y), static_cast<int>(corners[i][j].x));
+            Eigen::Vector4d tempPoint((corners[i][j].x - cx) * depth / fx,
+                                      (corners[i][j].y - cy) * depth / fy,
+                                      depth,
+                                      1.0);
+            detected_corners.push_back(tempPoint);
+          }
+        }
+      }
+  }
+  return detected_corners;
+}
+
+void calculate_error_using_aruco_marker(const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg, Eigen::Matrix4d movement_transform) {
+  auto prev_depth_img = cv_bridge::toCvCopy(prev_img_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+  auto curr_depth_img = cv_bridge::toCvCopy(curr_img_depth_msg, sensor_msgs::image_encodings::TYPE_32FC1);
+  auto prev_img = cv_bridge::toCvCopy(prev_img_msg, sensor_msgs::image_encodings::BGR8);
+  auto curr_img = cv_bridge::toCvCopy(curr_img_msg, sensor_msgs::image_encodings::BGR8);
+
+  auto detected_corners_prev_frame = find_aruco_corners(prev_img, prev_depth_img, cam_info_msg);
+  auto detected_corners_curr_frame = find_aruco_corners(curr_img, curr_depth_img, cam_info_msg);
+
+  PointCloudT::Ptr aruco_1 (new PointCloudT);
+  PointCloudT::Ptr aruco_2 (new PointCloudT);
+  PointCloudT::Ptr transformed_cloud (new PointCloudT);
+
+  if(detected_corners_curr_frame.size() == detected_corners_prev_frame.size()) {
+    auto error = 0.0;
+
+    for (unsigned int i = 0; i < detected_corners_curr_frame.size(); i++) {
+      auto prev_corner = detected_corners_prev_frame[i];
+      auto curr_corner = detected_corners_curr_frame[i];
+      pcl::PointXYZ prev_p;
+      prev_p.x  = prev_corner.x();
+      prev_p.y  = prev_corner.y();
+      prev_p.z  = prev_corner.z();
+      pcl::PointXYZ curr_p;
+      curr_p.x  = curr_corner.x();
+      curr_p.y  = curr_corner.y();
+      curr_p.z  = curr_corner.z();
+      aruco_1->points.push_back(prev_p);
+      aruco_2->points.push_back(curr_p);
+    }
+
+    //move checkerboard points to the robot base.
+    pcl::transformPointCloud(*aruco_1, *aruco_1, transformation_to_robot_base);
+    pcl::transformPointCloud(*aruco_2, *aruco_2, transformation_to_robot_base);
+
+    pcl::transformPointCloud(*aruco_1, *transformed_cloud, movement_transform);
+
+    aruco_1->width = aruco_2->width = transformed_cloud->width = detected_corners_curr_frame.size();
+    aruco_1->height = aruco_2->height = transformed_cloud->height = 1;
+
+    for(unsigned int i = 0; i < aruco_1->points.size(); i ++) {
+
+      // find euclidean distance
+      pcl::PointXYZ pt_2 = aruco_2->points[i];
+      pcl::PointXYZ pt_result = transformed_cloud->points[i];
+      auto distance = std::sqrt(std::pow(pt_2.x - pt_result.x, 2) + std::pow(pt_2.y - pt_result.y, 2) + std::pow(pt_2.z - pt_result.z, 2));
+      std::cout << "Point " << i + 1 << std::endl;
+      std::cout << "Selected point: " <<  pt_2 << std::endl;
+      std::cout << "Transformed point: " << pt_result << std::endl;
+      std::cout << "Distance: " << distance * 1000 << " mm" << std::endl;
+
+      error += distance;
+    }
+
+    error /= aruco_1->points.size();
+    std::cout << "Error: " << error * 1000 << " mm" << std::endl;
+
+    sensor_msgs::PointCloud2 msg_1;
+    pcl::toROSMsg(*aruco_1, msg_1);
+    msg_1.header.frame_id = "rgb_camera_link";
+    msg_1.header.stamp = ros::Time::now();
+    m_pub_cloud_1.publish(msg_1);
+
+    sensor_msgs::PointCloud2 msg_2;
+    pcl::toROSMsg(*aruco_2, msg_2);
+    msg_2.header.frame_id = "rgb_camera_link";
+    msg_2.header.stamp = ros::Time::now();
+    m_pub_cloud_2.publish(msg_2);
+
+    sensor_msgs::PointCloud2 msg_3;
+    pcl::toROSMsg(*transformed_cloud, msg_3);
+    msg_2.header.frame_id = "rgb_camera_link";
+    msg_2.header.stamp = ros::Time::now();
+    m_pub_cloud_3.publish(msg_3);
+
+  }
+
+
 }
 
 void calculate_error_using_chessboard_detection(const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg, Eigen::Matrix4d movement_transform) {
@@ -380,6 +492,8 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
 
   //calculate_error(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
   //calculate_error_using_chessboard_detection(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
+  calculate_error_using_aruco_marker(prev_img_msg, curr_img_msg, prev_img_depth_msg, curr_img_depth_msg, cam_info_msg, movement_transform);
+
 
   sensor_msgs::PointCloud2 msg_start;
   pcl::toROSMsg(*prev_ptr, msg_start);
