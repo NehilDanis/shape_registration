@@ -12,6 +12,9 @@ ICPAlgorithm::ICPAlgorithm(int max_num_iter)
 }
 
 void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointCloudT::Ptr &target) {
+  if(!this->m_corr_filtered.empty()) {
+    this->m_corr_filtered.clear();
+  }
   // Before applying icp, it is better to find an initial alignment, between the clouds.
 
 //  double start_calc_normals =ros::Time::now().toSec();
@@ -80,6 +83,7 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
 
    pcl::registration::CorrespondenceRejectorSampleConsensus<PointT> rejector;
    pcl::CorrespondencesPtr corr_filtered(new pcl::Correspondences);
+   //this->m_corr_filtered = std::shared_ptr<pcl::Correspondences>();
    rejector.setInputSource(source_keypoints);
    rejector.setInputTarget(target_keypoints);
    rejector.setInlierThreshold(0.25);
@@ -100,6 +104,10 @@ void ICPAlgorithm::get_initial_transformation(PointCloudT::Ptr &source, PointClo
 
    pcl::registration::TransformationEstimationSVD<PointT,PointT> transformation_est_SVD;
    transformation_est_SVD.estimateRigidTransformation(*source_keypoints, *target_keypoints, *corr_filtered, this->transformation);
+
+   for(auto const &corr :*corr_filtered) {
+     this->m_corr_filtered.push_back(corr);
+   }
 
    this->m_source_keypoints = source_keypoints;
    this->m_target_keypoints = target_keypoints;

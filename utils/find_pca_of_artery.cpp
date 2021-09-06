@@ -467,10 +467,11 @@ int main(int argc, char **argv)
 
    // visualize normals
    pcl::visualization::PCLVisualizer viewer("PCL Viewer");
-   viewer.setBackgroundColor (0.0, 0.0, 0.5);
-   viewer.addPointCloud(arm_cloud, "trajectory_cloud");
-   viewer.addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(trajectory_projected, trajectory_normals, 1, 0.02f, "normals");
-   viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 1.0, 1.0, "normals");
+   viewer.setBackgroundColor (1, 1, 1);
+   pcl::visualization::PointCloudColorHandlerCustom<PointT> arm_handler(arm_cloud, 0, 0, 150);
+   viewer.addPointCloud(arm_cloud, arm_handler, "trajectory_cloud");
+   viewer.addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(trajectory_projected, trajectory_normals, 1, 0.03f, "normals");
+   viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0, 0, "normals");
 
 
 

@@ -62,6 +62,8 @@ void visualize_point_cloud(const PointCloudT &source);
 void extract_indices(const PointCloudT::Ptr& source, std::shared_ptr<std::vector<int>>& indices_to_extract, PointCloudT::Ptr& output);
 
 
+void euclidean_clustering_pcl(const PointCloudT::Ptr& cloud);
+
 }
 
 

@@ -2,6 +2,7 @@
 * STD INCLUDES
 *******************************************************************/
 #include <iostream>
+#include <fstream>
 #include <yaml-cpp/yaml.h>
 
 /*******************************************************************
@@ -58,7 +59,7 @@ private:
     message_filters::Subscriber<sensor_msgs::Image> depth_sub;
     message_filters::Subscriber<sensor_msgs::Image> color_sub;
     message_filters::Subscriber<sensor_msgs::CameraInfo> cam_info_sub;
-
+    int count = 0;
     cv::Size board_size;
 };
 
@@ -157,17 +158,27 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
         initial_pt.point.y = tempPoint.y;
         initial_pt.point.z = tempPoint.z;
 
-        tf2::doTransform(initial_pt, transformed_pt, transformStamped);
+        /*tf2::doTransform(initial_pt, transformed_pt, transformStamped);
 
          tempPoint.x = transformed_pt.point.x;
          tempPoint.y = transformed_pt.point.y;
-         tempPoint.z = transformed_pt.point.z;
+         tempPoint.z = transformed_pt.point.z;*/
 
-         std::cout << i+1 << ":  [" << 1000 * transformed_pt.point.x <<", "<< 1000 * transformed_pt.point.y<<", "<< 1000 * transformed_pt.point.z<<"]"<<std::endl;
+         std::cout << i+1 << ":  [" << 1000 * tempPoint.x <<", "<< 1000 * tempPoint.y <<", "<< 1000 * tempPoint.z <<"]"<<std::endl;
+
+         if(this->count == 10) {
+           std::ofstream file;
+
+           file.open("/home/nehil/catkin_ws_registration/src/tracking_results/image_1_results.txt", std::ios_base::app); // append instead of overwrite
+           file << std::to_string(1000 * tempPoint.x) << " " << std::to_string(1000 * tempPoint.y) << " " << std::to_string(1000 * tempPoint.z) << "\n";
+         }
+
          if(i+1 == 21) {
            //std::cout << i+1 << ":  ["<<tempPoint.x <<", "<<tempPoint.y<<", "<<tempPoint.z<<"]"<<std::endl;
          }
     }
+
+    this->count += 1;
 
     //xyz_pub_.publish(points);
     //cv::drawChessboardCorners( chessboard, board_size, cv::Mat(corners), patternfound );

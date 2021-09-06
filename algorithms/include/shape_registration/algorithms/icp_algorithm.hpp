@@ -42,6 +42,7 @@ public:
 
 public:
   pcl::registration::TransformationEstimationSVD<PointT,PointT>::Matrix4 transformation;
+  inline pcl::Correspondences get_final_correspondences() { return this->m_corr_filtered; }
 
 
 private:
@@ -79,6 +80,7 @@ private:
   PointCloudT::Ptr m_target_keypoints;
   PointCloudT::Ptr m_source_non_keypoints;
   PointCloudT::Ptr m_target_non_keypoints;
+  pcl::Correspondences m_corr_filtered;
 };
 
 #endif // ICP_ALGORITHM_H

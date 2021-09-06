@@ -83,8 +83,8 @@ MRICameraMatching::MRICameraMatching(ros::NodeHandle *nh)
 
   this->m_source_cloud = *cloud;
 
-  //pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/arm_downsampled.pcd", *cloud);
-  //pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_downsampled.pcd", *cloud_artery);
+  pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/arm_downsampled_ct.pcd", *cloud);
+  pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery.pcd", *cloud_artery);
 
 
 
@@ -157,6 +157,13 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
   diff.y = centroid_t.y - centroid_s.y;
   diff.z = centroid_t.z - centroid_s.z;
 
+  PointCloudT::Ptr temp_source = source;
+  PointCloudT::Ptr temp_target = target;
+
+//  for(auto & point : temp_source->points) {
+//    point.z = point.z + 1;
+//  }
+
   for (auto &point : source->points) {
     point.x = point.x + diff.x;
     point.y = point.y + diff.y;
@@ -184,6 +191,58 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
   auto target_keypoints = this->shape_registration->get_target_keypoints();
   auto source_non_keypoints = this->shape_registration->get_source_non_keypoints();
   auto target_non_keypoints = this->shape_registration->get_target_non_keypoints();
+
+  pcl::PointCloud<pcl::PointXYZRGB> rgb_source;
+  for (const auto & point : source_keypoints->points) {
+    pcl::PointXYZRGB temp_point;
+    temp_point.x = point.x;
+    temp_point.y = point.y;
+    temp_point.z = point.z;
+    temp_point.r = 255;
+    temp_point.g = 0;
+    temp_point.b = 0;
+    rgb_source.points.push_back(temp_point);
+  }
+
+  for (const auto & point : source_non_keypoints->points) {
+    pcl::PointXYZRGB temp_point;
+    temp_point.x = point.x;
+    temp_point.y = point.y;
+    temp_point.z = point.z;
+    temp_point.r = 0;
+    temp_point.g = 0;
+    temp_point.b = 255;
+    rgb_source.points.push_back(temp_point);
+  }
+
+
+  pcl::PointCloud<pcl::PointXYZRGB> rgb_target;
+  for (const auto & point : target_keypoints->points) {
+    pcl::PointXYZRGB temp_point;
+    temp_point.x = point.x;
+    temp_point.y = point.y;
+    temp_point.z = point.z;
+    temp_point.r = 255;
+    temp_point.g = 0;
+    temp_point.b = 0;
+    rgb_target.points.push_back(temp_point);
+  }
+
+  for (const auto & point : target_non_keypoints->points) {
+    pcl::PointXYZRGB temp_point;
+    temp_point.x = point.x;
+    temp_point.y = point.y;
+    temp_point.z = point.z;
+    temp_point.r = 0;
+    temp_point.g = 255;
+    temp_point.b = 0;
+    rgb_target.points.push_back(temp_point);
+  }
+  rgb_source.height = 1;
+  rgb_target.height = 1;
+  rgb_source.width = rgb_source.points.size();
+  rgb_target.width = rgb_target.points.size();
+
 
 
   // create a visualizer
@@ -247,9 +306,51 @@ void MRICameraMatching::compute(const sensor_msgs::PointCloud2ConstPtr& ros_clou
    if (final_cloud.size() != 0) {
 
      // Save the points to pcd file.
+
      pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/arm_transformed.pcd", final_cloud);
      pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/arm_camera.pcd", *target);
      pcl::transformPointCloud(*artery, *artery, this->shape_registration->get_ICP_obj().getFinalTransformation());
+     pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/artery_in_cam.pcd", *artery);
+     pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/source_w_keypoints.pcd", rgb_source);
+     pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/target_w_keypoints.pcd", rgb_target);
+
+//     pcl::visualization::PCLVisualizer viewer("PCL visualizer");
+//     viewer.addPointCloud(std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>(rgb_source), "source_cloud");
+//     viewer.addPointCloud(std::make_shared<pcl::PointCloud<pcl::PointXYZRGB>>(rgb_target), "target_cloud");
+
+//     pcl::visualization::PointCloudColorHandlerCustom<PointT>
+//         cloud_inliers_handler(temp_source, 255, 0, 0); // Plane in RED
+//     viewer.addPointCloud(temp_source, cloud_inliers_handler, "cloud inliers");
+
+//     pcl::visualization::PointCloudColorHandlerCustom<PointT>
+//         cloud_outliers_handler(temp_target, 0, 0, 255); // Everything else in GRAY
+//     viewer.addPointCloud(temp_target, cloud_outliers_handler,
+//                          "cloud outliers");
+
+//     auto good_correspondences = this->shape_registration->get_final_correspondences();
+//     for (int i = 0; i < good_correspondences.size(); ++i)
+//     {
+//         pcl::PointXYZ & src_idx = temp_source->points[(good_correspondences)[i].index_query];
+//         pcl::PointXYZ & tgt_idx = temp_target->points[(good_correspondences)[i].index_match];
+//         std::string lineID = std::to_string(i);
+//         std::string lineID2 = std::to_string(i+200);
+
+//         // Generate a random (bright) color
+//         double r = (rand() % 100);
+//         double g = (rand() % 100);
+//         double b = (rand() % 100);
+//         double max_channel = std::max(r, std::max(g, b));
+//         r /= max_channel;
+//         g /= max_channel;
+//         b /= max_channel;
+
+//         viewer.addLine<PointT, PointT>(src_idx, tgt_idx, r, g, b, lineID);
+//     }
+
+//     while (!viewer.wasStopped()) {
+//       viewer.spinOnce();
+//     }
+
      sensor_msgs::PointCloud2 msg_final;
      pcl::toROSMsg(final_cloud, msg_final);
      msg_final.fields = ros_cloud->fields;

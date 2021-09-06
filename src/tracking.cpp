@@ -9,6 +9,7 @@
 #include <iostream>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/ml/kmeans.h>
 
 #include "shape_registration/utils/preprocessing.hpp"
 #include "shape_registration/algorithms/icp_algorithm.hpp"
@@ -409,6 +410,29 @@ void calculate_error(const sensor_msgs::ImageConstPtr& prev_img_msg, const senso
   }
 }
 
+void k_means_clustering(const PointCloudT & cloud) {
+  pcl::Kmeans real(static_cast<int> (cloud.points.size()), 3);
+  real.setClusterSize(2);
+  for(const auto & point : cloud) {
+    std::vector<float> data(3);
+    data[0] = point.x;
+    data[1] = point.y;
+    data[2] = point.z;
+    real.addDataPoint(data);
+  }
+  real.kMeans();
+  // get the cluster centroids
+  pcl::Kmeans::Centroids centroids = real.get_centroids();
+  std::cout << "points in total Cloud : " << cloud.points.size() << std::endl;
+  std::cout << "centroid count: " << centroids.size() << std::endl;
+  for (int i = 0; i<centroids.size(); i++)
+  {
+      std::cout << i << "_cent output: x: " << centroids[i][0] << " ,";
+      std::cout << "y: " << centroids[i][1] << " ,";
+      std::cout << "z: " << centroids[i][2] << std::endl;
+  }
+}
+
 
 void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_msg, const sensor_msgs::PointCloud2ConstPtr& curr_cloud_msg, const sensor_msgs::ImageConstPtr& prev_img_msg, const sensor_msgs::ImageConstPtr& curr_img_msg, const sensor_msgs::ImageConstPtr& prev_img_depth_msg, const sensor_msgs::ImageConstPtr& curr_img_depth_msg, const sensor_msgs::CameraInfoConstPtr& cam_info_msg){
   PointCloudT::Ptr prev_ptr (new PointCloudT);
@@ -455,8 +479,33 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
 
 
 
+  float avg_depth = 0.0f;
+  for (const auto &point : curr_ptr->points) {
+    avg_depth += point.z;
+  }
+  avg_depth = avg_depth / curr_ptr->points.size();
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster_curr (new pcl::PointCloud<pcl::PointXYZ>);
+  for (const auto& point : curr_ptr->points){
+    if(point.z < 1.5 * avg_depth)
+      cloud_cluster_curr->push_back (point); //*
+  }
+
+  avg_depth = 0.0f;
+  for (const auto &point : prev_ptr->points) {
+    avg_depth += point.z;
+  }
+  avg_depth = avg_depth / prev_ptr->points.size();
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster_prev (new pcl::PointCloud<pcl::PointXYZ>);
+  for (const auto& point : prev_ptr->points){
+    if(point.z < 1.5 * avg_depth)
+      cloud_cluster_prev->push_back (point); //*
+  }
+
+
   // once both curr and prev frames are set then apply icp and find the transformation between the two frames
-  m_icp->compute(prev_ptr, curr_ptr);
+  m_icp->compute(cloud_cluster_prev, cloud_cluster_curr);
 
   auto transformation = m_icp->get_ICP_obj().getFinalTransformation();
 
@@ -496,16 +545,32 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
 
 
   sensor_msgs::PointCloud2 msg_start;
-  pcl::toROSMsg(*prev_ptr, msg_start);
+  pcl::toROSMsg(*cloud_cluster_prev, msg_start);
   msg_start.header.frame_id = "rgb_camera_link";
   msg_start.header.stamp = ros::Time::now();
   movement_start_pub.publish(msg_start);
 
   sensor_msgs::PointCloud2 msg_stop;
-  pcl::toROSMsg(*curr_ptr, msg_stop);
+  pcl::toROSMsg(*cloud_cluster_curr, msg_stop);
   msg_stop.header.frame_id = "rgb_camera_link";
   msg_stop.header.stamp = ros::Time::now();
   movement_end_pub.publish(msg_stop);
+
+//  //Preprocessing::euclidean_clustering_pcl(curr_ptr);
+//  float avg_depth = 0.0f;
+//  for (const auto &point : curr_ptr->points) {
+//    avg_depth += point.z;
+//  }
+//  avg_depth = avg_depth / curr_ptr->points.size();
+//  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
+//  for (const auto& point : curr_ptr->points){
+//    if(point.z < 1.5 * avg_depth)
+//      cloud_cluster->push_back (point); //*
+//  }
+//  cloud_cluster->width = cloud_cluster->size ();
+//  cloud_cluster->height = 1;
+//  cloud_cluster->is_dense = true;
+//  //pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/to_kmeans.pcd", *cloud_cluster);
 
 }
 

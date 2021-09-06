@@ -85,13 +85,13 @@ int main() {
   auto transformation = icp_->get_ICP_obj().getFinalTransformation();
   std::cout << transformation << std::endl;
   Eigen::Quaternionf q(transformation.block<3,3>(0,0));
-  std::cout << q.x() << std::endl;
-  std::cout << q.y() << std::endl;
-  std::cout << q.z() << std::endl;
-  std::cout << q.w() << std::endl;
-  std::cout << transformation(0, 3) << std::endl;
-  std::cout << transformation(1, 3) << std::endl;
-  std::cout << transformation(2, 3) << std::endl;
+  std::cout << "q.x()" << q.x() << std::endl;
+  std::cout << "q.y()" << q.y() << std::endl;
+  std::cout << "q.z()" << q.z() << std::endl;
+  std::cout << "q.w()" << q.w() << std::endl;
+  std::cout << "x()" << transformation(0, 3) << std::endl;
+  std::cout << "y()" << transformation(1, 3) << std::endl;
+  std::cout << "z()" << transformation(2, 3) << std::endl;
 
   return 0;
 }
