@@ -443,6 +443,9 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
 
   // remove the plane from the point cloud
 
+  prev_ptr = Preprocessing::extract_plane(prev_ptr, 0.017);
+  curr_ptr = Preprocessing::extract_plane(curr_ptr, 0.017);
+
   prev_ptr = Preprocessing::voxel_grid_downsampling(prev_ptr, 0.015f);
   prev_ptr = Preprocessing::statistical_filtering(prev_ptr, 1.0);
 
@@ -487,7 +490,7 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster_curr (new pcl::PointCloud<pcl::PointXYZ>);
   for (const auto& point : curr_ptr->points){
-    if(point.z < 1.5 * avg_depth)
+    if(point.z < 1.7 * avg_depth)
       cloud_cluster_curr->push_back (point); //*
   }
 
@@ -499,10 +502,9 @@ void calculate_trasformation(const sensor_msgs::PointCloud2ConstPtr& prev_cloud_
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster_prev (new pcl::PointCloud<pcl::PointXYZ>);
   for (const auto& point : prev_ptr->points){
-    if(point.z < 1.5 * avg_depth)
+    if(point.z < 1.7 * avg_depth)
       cloud_cluster_prev->push_back (point); //*
   }
-
 
   // once both curr and prev frames are set then apply icp and find the transformation between the two frames
   m_icp->compute(cloud_cluster_prev, cloud_cluster_curr);

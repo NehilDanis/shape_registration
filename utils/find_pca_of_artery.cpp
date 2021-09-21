@@ -465,13 +465,21 @@ int main(int argc, char **argv)
    std::cout << trajectory_projected->points.size() << std::endl;
    std::cout << trajectory_normals->points.size() << std::endl;
 
+//   for(auto &point : trajectory_normals->points) {
+//     point._Normal::normal_x *= -1;
+//     point._Normal::normal_y *= -1;
+//     point._Normal::normal_z *= -1;
+//   }
+
    // visualize normals
    pcl::visualization::PCLVisualizer viewer("PCL Viewer");
    viewer.setBackgroundColor (1, 1, 1);
-   pcl::visualization::PointCloudColorHandlerCustom<PointT> arm_handler(arm_cloud, 0, 0, 150);
+   pcl::visualization::PointCloudColorHandlerCustom<PointT> arm_handler(arm_cloud, 0, 0, 255);
    viewer.addPointCloud(arm_cloud, arm_handler, "trajectory_cloud");
    viewer.addPointCloudNormals<pcl::PointXYZ,pcl::Normal>(trajectory_projected, trajectory_normals, 1, 0.03f, "normals");
    viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_COLOR, 1.0, 0, 0, "normals");
+   viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_LINE_WIDTH, 3, "normals");
+   viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 5, "trajectory_cloud");
 
 
 

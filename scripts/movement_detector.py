@@ -23,50 +23,50 @@ from PyQt5.QtCore import *
 button_pressed = False
 
 
-'''class Window(QMainWindow):
-    def __init__(self):
-        super(QMainWindow, self).__init__()
+#class Window(QMainWindow):
+#    def __init__(self):
+#        super(QMainWindow, self).__init__()
 
-        # setting title
-        self.setWindowTitle("Python ")
+#        # setting title
+#        self.setWindowTitle("Python ")
 
-        # setting geometry
-        self.setGeometry(100, 100, 600, 400)
+#        # setting geometry
+#        self.setGeometry(100, 100, 600, 400)
 
-        # calling method
-        self.UiComponents()
+#        # calling method
+#        self.UiComponents()
 
-        # showing all the widgets
-        self.show()
+#        # showing all the widgets
+#        self.show()
 
-    # method for widgets
-    def UiComponents(self):
+#    # method for widgets
+#    def UiComponents(self):
 
-        # creating a push button
-        button = QPushButton("START_ROBOT", self)
+#        # creating a push button
+#        button = QPushButton("START_ROBOT", self)
 
-        # setting geometry of button
-        button.setGeometry(200, 150, 100, 40)
+#        # setting geometry of button
+#        button.setGeometry(200, 150, 100, 40)
 
-        # setting name
-        button.setAccessibleName("push button")
+#        # setting name
+#        button.setAccessibleName("push button")
 
-        # adding action to a button
-        button.clicked.connect(self.clickme)
+#        # adding action to a button
+#        button.clicked.connect(self.clickme)
 
-        # accessing the name of button
-        name = button.accessibleName()
+#        # accessing the name of button
+#        name = button.accessibleName()
 
-        # creating a label to display a name
-        label = QLabel(self)
-        label.setText(name)
-        label.move(200, 200)
+#        # creating a label to display a name
+#        label = QLabel(self)
+#        label.setText(name)
+#        label.move(200, 200)
 
-    # action method
-    def clickme(self):
-        global button_pressed
-        button_pressed = True
-        print("pressed")'''
+#    # action method
+#    def clickme(self):
+#        global button_pressed
+#        button_pressed = True
+#        print("pressed")
 
 class MovementDetector():
     def __init__(self):
@@ -128,9 +128,42 @@ class MovementDetector():
         contours = fc[0]
         largest_contour = max(contours, key=cv2.contourArea)
         #cv2.drawContours(img, [largest_contour], -2, (0,255,0), 5)
-        coords = np.where(mask == 255)
+
+        # find the min-max x and y of the largest_contour and enlarge it as a square
+        extLeft = largest_contour[largest_contour[:, :, 0].argmin()][0][0]
+        extRight = largest_contour[largest_contour[:, :, 0].argmax()][0][0]
+        extTop = largest_contour[largest_contour[:, :, 1].argmin()][0][1]
+        extBot = largest_contour[largest_contour[:, :, 1].argmax()][0][1]
+
+        # make the contour area larger so that later we can apply plane segmentation
+
+        extLeft = (extLeft - 50) if extLeft - 50 >= 0 else 0
+        extRight = (extRight+ 50) if extLeft + 50 < img.shape[0] else img.shape[0] - 1
+        extTop = (extTop - 50) if extTop - 50 >= 0 else 0
+        extBot = (extBot+ 50) if extBot + 50 < img.shape[1] else img.shape[1] - 1
+
+#        cv2.rectangle(img,(extLeft,extTop),(extRight,extBot),(0,255,0),3)
+#        cv2.imwrite("/home/nehil/Desktop/rect_img.jpg", img)
+
+        mask_new = np.zeros((img.shape), dtype=np.uint8)
+
+        # define points (as small diamond shape)
+        pts = np.array( [[[extLeft,extTop],[extRight,extTop],[extRight,extBot],[extLeft,extBot]]], dtype=np.int32 )
+        cv2.fillPoly(mask_new, pts, 255 )
+        cv2.imwrite("/home/nehil/Desktop/mask.jpg", mask_new)
+
+
+
+        coords = np.where(mask_new == 255)
         rows = coords[0]
         cols = coords[1]
+#        print(rows)
+#        print(cols)
+
+#        rows = range(extTop, extBot)
+#        cols = range(extLeft, extRight)
+#        print(rows)
+#        print(cols)
 
         cloud_points = []
 
@@ -244,7 +277,7 @@ class MovementDetector():
 def main(args):
     rospy.init_node('MovementDetectorNode', anonymous=True)
     pp = MovementDetector()
-    # create pyqt5 app
+#    # create pyqt5 app
 #    App = QApplication(sys.argv)
 
 #    # create the instance of our Window

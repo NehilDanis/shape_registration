@@ -46,52 +46,63 @@ int main() {
   auto icp_ = std::make_shared<ICPAlgorithm>(1000);
 
   PointCloudT::Ptr result (new PointCloudT);
-  auto coords_in_cam = read_file("/home/nehil/catkin_ws_registration/src/shape_registration/coords_in_camera.txt");
-  auto coords_in_robot = read_file("/home/nehil/catkin_ws_registration/src/shape_registration/coords_in_robot.txt");
+  auto coords_in_cam = read_file("/home/nehil/catkin_ws_registration/src/shape_registration/test_cam.txt");
+  auto coords_in_robot = read_file("/home/nehil/catkin_ws_registration/src/shape_registration/test_robot.txt");
 
 
-  icp_->find_initial_transform_for_small_sets(coords_in_cam, coords_in_robot);
+//  icp_->find_initial_transform_for_small_sets(coords_in_cam, coords_in_robot);
 
-  // once both curr and prev frames are set then apply icp and find the transformation between the two frames
-  icp_->compute(coords_in_cam, coords_in_robot, icp_->transformation);
+//  // once both curr and prev frames are set then apply icp and find the transformation between the two frames
+//  icp_->compute(coords_in_cam, coords_in_robot, icp_->transformation);
 
-  pcl::transformPointCloud(*coords_in_cam, *result, icp_->get_ICP_obj().getFinalTransformation());
+//  pcl::transformPointCloud(*coords_in_cam, *result, icp_->get_ICP_obj().getFinalTransformation());
+//  std::cout << icp_->get_ICP_obj().getFinalTransformation() * icp_->transformation << std::endl;
 
-  pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
-  viewer->setBackgroundColor (0, 0, 0);
-  pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (coords_in_cam, 0, 0, 255);
-  viewer->addPointCloud<PointT> (coords_in_cam, ct_arm_color, "coords_in_cam");
+//  pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
+//  viewer->setBackgroundColor (0, 0, 0);
+//  pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (coords_in_cam, 0, 0, 255);
+//  viewer->addPointCloud<PointT> (coords_in_cam, ct_arm_color, "coords_in_cam");
 
-  pcl::visualization::PointCloudColorHandlerCustom<PointT> result_color (result, 0, 255, 0);
-  viewer->addPointCloud<PointT> (result, result_color, "result");
+//  pcl::visualization::PointCloudColorHandlerCustom<PointT> result_color (result, 0, 255, 0);
+//  viewer->addPointCloud<PointT> (result, result_color, "result");
 
-  pcl::visualization::PointCloudColorHandlerCustom<PointT> target_cloud_color (coords_in_robot, 255, 0, 0);
-  viewer->addPointCloud<PointT> (coords_in_robot, target_cloud_color, "coords_in_robot");
+//  pcl::visualization::PointCloudColorHandlerCustom<PointT> target_cloud_color (coords_in_robot, 255, 0, 0);
+//  viewer->addPointCloud<PointT> (coords_in_robot, target_cloud_color, "coords_in_robot");
 
-  while (!viewer->wasStopped ())
-  {
-      viewer->spinOnce (100);
-  }
+//  while (!viewer->wasStopped ())
+//  {
+//      viewer->spinOnce (100);
+//  }
+
+  Eigen::Matrix4d transformation;
+  transformation << -0.0217961,   0.635336,  -0.771934,    1.28516,
+                    0.99962, 0.00104841, -0.0273565,  0.0323365,
+                  -0.016593, -0.772267,  -0.635137,    0.74643,
+                          0,          0,          0,          1;
+
+  pcl::transformPointCloud(*coords_in_cam, *result, transformation);
 
   auto distance = 0.0f;
   for (unsigned int i = 0 ; i < coords_in_cam->points.size(); i ++) {
     auto gt = coords_in_robot->points[i];
     auto calc = result->points[i];
-    distance += std::sqrt(std::pow(gt.x - calc.x, 2) + std::pow(gt.y - calc.y, 2) + std::pow(gt.z - calc.z, 2));
+    auto ind_error =  std::sqrt(std::pow(gt.x - calc.x, 2) + std::pow(gt.y - calc.y, 2) + std::pow(gt.z - calc.z, 2));
+    std::cout << ind_error <<std::endl;
+    distance += ind_error;
   }
 
   std::cout << "Error: " << distance * 1000.0f/ float(coords_in_cam->points.size()) << " mm" << std::endl;
 
-  auto transformation = icp_->get_ICP_obj().getFinalTransformation();
-  std::cout << transformation << std::endl;
-  Eigen::Quaternionf q(transformation.block<3,3>(0,0));
-  std::cout << "q.x()" << q.x() << std::endl;
-  std::cout << "q.y()" << q.y() << std::endl;
-  std::cout << "q.z()" << q.z() << std::endl;
-  std::cout << "q.w()" << q.w() << std::endl;
-  std::cout << "x()" << transformation(0, 3) << std::endl;
-  std::cout << "y()" << transformation(1, 3) << std::endl;
-  std::cout << "z()" << transformation(2, 3) << std::endl;
+//  auto transformation = icp_->get_ICP_obj().getFinalTransformation();
+//  std::cout << transformation << std::endl;
+//  Eigen::Quaternionf q(transformation.block<3,3>(0,0));
+//  std::cout << "q.x()" << q.x() << std::endl;
+//  std::cout << "q.y()" << q.y() << std::endl;
+//  std::cout << "q.z()" << q.z() << std::endl;
+//  std::cout << "q.w()" << q.w() << std::endl;
+//  std::cout << "x()" << transformation(0, 3) << std::endl;
+//  std::cout << "y()" << transformation(1, 3) << std::endl;
+//  std::cout << "z()" << transformation(2, 3) << std::endl;
 
   return 0;
 }

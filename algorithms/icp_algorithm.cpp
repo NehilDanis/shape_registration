@@ -166,6 +166,9 @@ PointCloudT ICPAlgorithm::compute(PointCloudT::Ptr &source, PointCloudT::Ptr &ta
   if(this->icp.hasConverged() && this->icp.getFitnessScore() < 0.0003) {
     return final_cloud;
   }
+//  if(this->icp.hasConverged()) {
+//    return final_cloud;
+//  }
   final_cloud.clear();
   return final_cloud;
 

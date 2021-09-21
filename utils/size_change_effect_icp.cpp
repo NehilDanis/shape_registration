@@ -104,6 +104,7 @@ int main() {
   // Read the ct data
 
   PointCloudT::Ptr ct_arm_cloud (new PointCloudT);
+  PointCloudT::Ptr target (new PointCloudT);
 
   if (pcl::io::loadPCDFile<PointT> ("/home/nehil/Desktop/slicer_results/plane_segmented_arm.pcd", *ct_arm_cloud) == -1) //* load the file
   {
@@ -114,11 +115,12 @@ int main() {
     point.x = point.x / 1000;
     point.y = point.y / 1000;
     point.z = point.z / 1000;
+    target->points.push_back(pcl::PointXYZ(point.x * 2, point.y * 2, point.z * 2));
   }
 
   // Add gaussian noise to the arm cloud and create the target data
 
-  auto target = add_gaussian_noise(ct_arm_cloud);
+  //auto target = add_gaussian_noise(ct_arm_cloud);
   transform_cloud(target);
 
   target = Preprocessing::voxel_grid_downsampling(target, 0.015f);
@@ -144,30 +146,40 @@ int main() {
     point.z = point.z + diff.z;
   }
 
-  shape_registration->get_initial_transformation(target, ct_arm_cloud);
+  //shape_registration->get_initial_transformation(target, ct_arm_cloud);
 
-   pcl::transformPointCloud(*target, *target, shape_registration->transformation);
+   //pcl::transformPointCloud(*target, *target, shape_registration->transformation);
 
+   while(true) {
+     auto final_cloud = std::make_shared<PointCloudT>(shape_registration->compute(target, ct_arm_cloud));
+     if(!final_cloud->empty()) {
+       // Save the points to pcd file.
 
-   auto final_cloud = std::make_shared<PointCloudT>(shape_registration->compute(target, ct_arm_cloud));
+       for (size_t i = 0; i < target->points.size(); i ++) {
 
-   // Save the points to pcd file.
-   pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm_transformed.pcd", *final_cloud);
-   pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm.pcd", *ct_arm_cloud);
+       }
 
-   if (final_cloud->points.size() != 0) {
-      pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
-      viewer->setBackgroundColor (1, 1, 1);
-      pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (ct_arm_cloud, 0, 0, 255);
-      viewer->addPointCloud<PointT> (ct_arm_cloud, ct_arm_color, "target");
+       pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm_transformed.pcd", *final_cloud);
+       pcl::io::savePCDFileASCII ("/home/nehil/catkin_ws_registration/src/ct_noisy_icp_results/arm.pcd", *ct_arm_cloud);
 
-      pcl::visualization::PointCloudColorHandlerCustom<PointT> target_cloud_color (final_cloud, 255, 0, 0);
-      viewer->addPointCloud<PointT> (final_cloud, target_cloud_color, "result");
+       if (final_cloud->points.size() != 0) {
+          pcl::visualization::PCLVisualizer::Ptr viewer  = std::make_shared<pcl::visualization::PCLVisualizer>("3D Viewer");
+          viewer->setBackgroundColor (1, 1, 1);
+          pcl::visualization::PointCloudColorHandlerCustom<PointT> ct_arm_color (ct_arm_cloud, 0, 0, 255);
+          viewer->addPointCloud<PointT> (ct_arm_cloud, ct_arm_color, "target");
 
-      while (!viewer->wasStopped ())
-      {
-          viewer->spinOnce (100);
-      }
+          pcl::visualization::PointCloudColorHandlerCustom<PointT> target_cloud_color (final_cloud, 255, 0, 0);
+          viewer->addPointCloud<PointT> (final_cloud, target_cloud_color, "result");
+
+          while (!viewer->wasStopped ())
+          {
+              viewer->spinOnce (100);
+          }
+       }
+
+       break;
+     }
    }
+
   return 0;
 }

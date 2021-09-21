@@ -27,12 +27,16 @@ class PublisherPyro(object):
         self.depth_sub = message_filters.Subscriber("/k4a/depth_to_rgb/image_rect", Image)
         self.cam_info_sub = message_filters.Subscriber("/k4a/depth_to_rgb/camera_info", CameraInfo)
 
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.cam_info_sub], 10, 0.1, allow_headerless=True)
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.image_sub, self.depth_sub, self.cam_info_sub], 1, 0.1, allow_headerless=True)
         self.ts.registerCallback(self.callback)
+        #self.msg_filter_cache = message_filters.Cache(self.ts, 1)
         self.pub = rospy.Publisher("mask", Image, queue_size=1)
         self.pub_img = rospy.Publisher("img", Image, queue_size=1)
         self.pub_depth = rospy.Publisher("depth_img", Image, queue_size=1)
         self.pub_cam_info = rospy.Publisher("cam_info", CameraInfo, queue_size=1)
+#        while True:
+#            if self.msg_filter_cache.getLastestTime():
+#                print(self.msg_filter_cache.getLastestTime())
 
 
     def callback(self, img_msg, depth_msg, cam_info_msg):
@@ -47,8 +51,8 @@ class PublisherPyro(object):
         mask = self.pyro_server.segment_arm(img.copy())
 #        print("world")
         end_sending_time = time.time()
-#        print("sending the image and receiving back the mask time : ")
-#        print(end_sending_time - start_sending_time)
+        print("sending the image and receiving back the mask time : ")
+        print(end_sending_time - start_sending_time)
 
         # the calculated mask using the segmentation network is published to the mask topic
         msg = Image()

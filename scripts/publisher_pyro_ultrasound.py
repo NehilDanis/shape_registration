@@ -17,8 +17,11 @@ Pyro5.config.SERIALIZER = "msgpack"
 class PublisherPyro(object):
     def __init__(self, uri):
         self.pyro_server = Pyro5.api.Proxy(uri)
-        self.sub_img = rospy.Subscriber("/imfusion/cephasonics",Image,self.callback)
+#        self.sub_img = rospy.Subscriber("/imfusion/cephasonics",Image,self.callback)
         self.pub_img = rospy.Publisher("segmentedImg",Image, queue_size=1)
+        while(True):
+            img_msg = rospy.wait_for_message("/imfusion/cephasonics",Image)
+            self.callback(img_msg)
 
     def callback(self, img_msg):
         self.pyro_server._pyroClaimOwnership()

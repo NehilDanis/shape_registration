@@ -19,3 +19,15 @@
         <param name="calibration_file_path" type="string" value="/home/nehil/.ros/easy_handeye/iiwa_azure_kinect_eye_on_base.yaml"/>
     </node>
 </launch>
+
+<!-- points used
+first board 7x6
+34
+14
+22
+3
+second board 9x8
+44
+24
+4
+-->

@@ -14,10 +14,10 @@ class ImageSaver():
     def __init__(self):
         self.set_id = 1
         self.num_img = 1
-        self.count = 157
+        self.count = 273
         self.bridge = CvBridge()
         self.sub = rospy.Subscriber("/k4a/rgb/image_rect_color", Image, self.callback)
-        self.rate = rospy.Rate(0.5) # 1 Hz
+        self.rate = rospy.Rate(1) # 1 Hz
         # Do stuff, maybe in a while loop
 
     def callback(self, img_msg):

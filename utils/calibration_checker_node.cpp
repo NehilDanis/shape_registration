@@ -164,7 +164,7 @@ void Fusion_and_Publish::callback(const sensor_msgs::ImageConstPtr &depth_image,
          tempPoint.y = transformed_pt.point.y;
          tempPoint.z = transformed_pt.point.z;*/
 
-         std::cout << i+1 << ":  [" << 1000 * tempPoint.x <<", "<< 1000 * tempPoint.y <<", "<< 1000 * tempPoint.z <<"]"<<std::endl;
+         std::cout << i+1 << ":  [" << 1000 * tempPoint.x <<" "<< 1000 * tempPoint.y <<" "<< 1000 * tempPoint.z <<"]"<<std::endl;
 
          if(this->count == 10) {
            std::ofstream file;
